@@ -3,7 +3,7 @@ services:
     scipy-notebook:
         ports:
             - "${JUPYTER_CONTAINER_HOST_PORT}:8888"
-            - '49155:49155'
+            - '8889:8889'
         volumes:
             - "${NOTEBOOK_DIR}:/home/jovyan"
             - "${PERMANENT_STORAGE}:/home/jovyan/permanent_storage/"
