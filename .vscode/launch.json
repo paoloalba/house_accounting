@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Remote Attach",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 8889
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "c:/your/full/path/to/notebooks/",
+                    "remoteRoot": "/home/jovyan/"
+                }
+            ]
+        }
+    ]
+}
