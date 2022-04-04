@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 
@@ -6,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from locale import setlocale, LC_ALL, locale_alias, resetlocale
 from contextlib import contextmanager
+from sqlalchemy.sql import select
 
 from house_accounting.models import Base, Cashflow, MainCategory, SubCategory, Tag
 from house_accounting.enumerators import MainCategory as EnumMainCategory
@@ -21,6 +24,8 @@ class AccountingTable:
 
     def __init__(self, db_path) -> None:
         self.db_path = db_path
+
+        self.db_engine = self.get_db_engine(future=False)
 
     #region Helper methods
     def get_db_engine(self, future=True):
@@ -38,18 +43,79 @@ class AccountingTable:
             return datetime.strptime(input_str, "%d %b %y")
     #endregion
 
+    def get_df(
+        self,
+        ):
+        df = pd.read_sql(
+            select(Cashflow, MainCategory, SubCategory, Tag)
+            .join(Cashflow.main_category)
+            .join(Cashflow.sub_category)
+            .join(Tag, Cashflow.tags),
+            self.db_engine,
+        )
+
+        cols_to_drop = []
+        cols_to_drop.append("main_category_id")
+        cols_to_drop.append("sub_category_id")
+        cols_to_drop.append("id_1")
+        cols_to_drop.append("id_2")
+        cols_to_drop.append("id_3")
+        df.drop(cols_to_drop, inplace=True, axis=1)
+
+        unique_cols = df.columns.tolist()
+        unique_cols.remove("tag")
+
+        row_list = []
+        grp_df = df.groupby("id")
+        for kkk, ddd in grp_df:
+            singleton = ddd.drop_duplicates(subset=unique_cols)
+            if len(singleton.index) != 1:
+                raise Exception("there are some unexpected duplicates")
+            singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(sorted(ddd.tag.tolist()))
+            row_list.append(singleton)
+        df = pd.concat(row_list)
+
+        df.sort_values("date", inplace=True, axis=0, ignore_index=True)
+        df.rename(columns={"category":"main_category", "category_1":"sub_category"}, inplace=True)
+
+        return df
+
+    def overwrite_db_with_df(
+        self,
+        input_df
+    ):
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+        self.db_engine = self.get_db_engine(future=False)
+
+        with Session(self.db_engine) as session:
+            for ido, eee in input_df.iterrows():
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=eee.date,
+                    amount=eee.amount,
+                    description=eee.description,
+                    main_category=eee.main_category,
+                    sub_category=eee.sub_category,
+                    tags=eee.tag.split(";"),
+                )
+                session.add(cfl_entry)
+
+            session.commit()
+
     #region generate default
     def generate_default_db(
         self,
     ):
-        engine = self.get_db_engine()
+        self.db_engine = self.get_db_engine(future=False)
 
         end_date = date.today().replace(day=27)
         start_date = end_date.replace(year=end_date.year - 2)
 
         all_dates = pd.date_range(start=start_date, end=end_date).to_pydatetime()
 
-        with Session(engine) as session:
+        with Session(self.db_engine) as session:
             cfl_entry = Cashflow(
                 session=session,
                 date=start_date,

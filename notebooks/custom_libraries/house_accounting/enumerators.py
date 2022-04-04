@@ -12,6 +12,9 @@ class SubCategory(Enum):
     OneTime = 4
     Exceptional = 6
     Food = 7
+    Transport = 8
+    Health = 9
+    Travel = 10
 
 class SampleFrequency(Enum):
     Daily=1
