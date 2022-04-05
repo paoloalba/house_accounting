@@ -222,6 +222,24 @@ class AccountingDBManager(WidgetBase):
             layout=button_layout,
         )
         left_box_list.append(update_entries_button)
+        left_box_list.append(
+            widgets.HTML(
+                value="<hr>",
+            )
+        )
+
+        self.days_rolling_window_int = widgets.IntText(
+            value=30,
+            description='Days rolling window:',
+            disabled=False,
+            style=dict(description_width="initial"),
+        )        
+        left_box_list.append(self.days_rolling_window_int)
+        self.normalise_rolling_results_checkbox = widgets.Checkbox(
+            value=False, description="Normalise to days", disabled=False, indent=False
+        )
+        left_box_list.append(self.normalise_rolling_results_checkbox)
+        
         #endregion
         #region Right Box
         self.output_window = widgets.Output(layout=widgets.Layout(
@@ -390,6 +408,61 @@ class AccountingDBManager(WidgetBase):
         monday2 = d2 - timedelta(days=d2.weekday())
 
         return (monday2 - monday1).days / 7 + 1
+
+    @staticmethod
+    def create_rolling_plot(input_df, days_offset=30, normalise=False):
+        ofs = f"{days_offset}D"
+        fil_df = input_df[input_df.sub_category != "Initial"]
+
+        all_ser = []
+        all_ser.append(
+            fil_df[fil_df.main_category == "Income"]
+            .groupby("date")
+            .apply(lambda x: x.amount.sum())
+            .rename(f"income-{ofs}")
+        )
+        all_ser.append(fil_df.groupby("date").apply(lambda x: x.amount.sum()).rename(f"net-{ofs}"))
+        all_ser.append(
+            fil_df[fil_df.main_category == "Outcome"]
+            .groupby("date")
+            .apply(lambda x: -x.amount.sum())
+            .rename(f"outcome-{ofs}")
+        )
+
+        fig = go.Figure()
+        min_y = 0
+        max_y = 0
+        for ser in all_ser:
+            ser.sort_index(inplace=True)
+            ser.index = pd.to_datetime(ser.index)
+
+            ofs_int = int(ofs.replace("D", ""))
+            s1 = ser.rolling(window=ofs).sum()
+
+            start_date = s1.index.min() + pd.Timedelta(ofs_int, unit="D")
+            s1 = s1[s1.index > start_date]
+            if normalise:
+                s1 = s1 / ofs_int
+
+            fig.add_trace(
+                go.Scatter(
+                    x=s1.index,
+                    y=s1.values,
+                    mode="lines",
+                    hovertemplate="%{y:,.2f}",
+                    name=ser.name,
+                )
+            )
+            mu = s1.mean()
+            sigma = s1.std()
+            fact = 2
+            min_y = min(min_y, mu - fact * sigma)
+            max_y = max(max_y, mu + fact * sigma)
+            print(f"{ser.name:<15}: {mu:,.2f}" + " \u00B1 " + f"{sigma:,.2f}")
+
+        fig.update_layout(hovermode="x", yaxis_range=[0, max_y])
+        
+        return fig
 
     @staticmethod
     def get_income_analysis(input_df):
@@ -604,5 +677,9 @@ class AccountingDBManager(WidgetBase):
             df, past_df, min_date = self.filter_df(df)
 
             fig = px.sunburst(df, path=["main_category", "sub_category", "tag"], values="amount")
+            fig.show()
+
+            df, past_df, min_date = self.get_filtered_df()
+            fig = self.create_rolling_plot(df, days_offset=self.days_rolling_window_int.value, normalise=self.normalise_rolling_results_checkbox.value)
             fig.show()
     #endregion
