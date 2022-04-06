@@ -16,6 +16,11 @@ class SubCategory(Enum):
     Health = 9
     Travel = 10
 
+class TimeCategory(Enum):
+    Recurring = 1
+    OneTime = 2
+    Exceptional = 3
+
 class SampleFrequency(Enum):
     Daily=1
     Weekly=2
