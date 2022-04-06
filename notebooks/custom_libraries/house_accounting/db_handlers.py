@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import pandas as pd
 import numpy as np
@@ -103,6 +104,14 @@ class AccountingTable:
                 session.add(cfl_entry)
 
             session.commit()
+
+    def create_backup(self):
+        base_name = os.path.basename(self.db_path)
+        base_name, extension = os.path.splitext(base_name)        
+        dir_name = os.path.dirname(self.db_path)
+
+        new_name = os.path.join(dir_name, f"{base_name}-backup_{datetime.now():%Y%m%d%H%M}{extension}")
+        shutil.copy(self.db_path, new_name)
 
     #region generate default
     def generate_default_db(

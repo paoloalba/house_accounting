@@ -239,7 +239,21 @@ class AccountingDBManager(WidgetBase):
             value=False, description="Normalise to days", disabled=False, indent=False
         )
         left_box_list.append(self.normalise_rolling_results_checkbox)
+        left_box_list.append(
+            widgets.HTML(
+                value="<hr>",
+            )
+        )
         
+        create_backupt_button = widgets.Button(
+            description="Create DB backup",
+            disabled=False,
+            button_style="",
+            tooltip="",
+            icon="check",
+            layout=button_layout,
+        )
+        left_box_list.append(create_backupt_button)
         #endregion
         #region Right Box
         self.output_window = widgets.Output(layout=widgets.Layout(
@@ -267,6 +281,7 @@ class AccountingDBManager(WidgetBase):
         add_row_button.on_click(self.add_row)
         clear_fields_button.on_click(self.clear_fields)
         update_entries_button.on_click(self.update_entries)
+        create_backupt_button.on_click(self.create_backupt)
 
     def display(self):
         super().display()
@@ -429,6 +444,8 @@ class AccountingDBManager(WidgetBase):
             .rename(f"outcome-{ofs}")
         )
 
+        box_fig = go.Figure()
+        violin_fig = go.Figure()
         fig = go.Figure()
         min_y = 0
         max_y = 0
@@ -458,11 +475,26 @@ class AccountingDBManager(WidgetBase):
             fact = 2
             min_y = min(min_y, mu - fact * sigma)
             max_y = max(max_y, mu + fact * sigma)
-            print(f"{ser.name:<15}: {mu:,.2f}" + " \u00B1 " + f"{sigma:,.2f}")
+            print(f"{ser.name:<15}: {mu:,.2f}" + " \u00B1 " + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}")
+
+            box_fig.add_trace(go.Box(y=s1.values, name=ser.name, boxmean='sd'))
+
+            violin_fig.add_trace(go.Violin(
+                                    y=s1.values,
+                                    name=ser.name,
+                                    box_visible=False,
+                                    meanline_visible=True))            
 
         fig.update_layout(hovermode="x", yaxis_range=[0, max_y])
-        
-        return fig
+        box_fig.update_layout(
+            # autosize=False,
+            width=700,
+            height=800,)
+        violin_fig.update_layout(
+            # autosize=False,
+            width=700,
+            height=800,)
+        return fig, box_fig, violin_fig
 
     @staticmethod
     def get_income_analysis(input_df):
@@ -487,6 +519,8 @@ class AccountingDBManager(WidgetBase):
         return net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days
 
     #region Button actions
+    def create_backupt(self, _):
+        self.acc_table.create_backup()
     def clear_fields(self, _):
         self.date_picker.value = None
         self.amount_text.value = 0
@@ -680,6 +714,8 @@ class AccountingDBManager(WidgetBase):
             fig.show()
 
             df, past_df, min_date = self.get_filtered_df()
-            fig = self.create_rolling_plot(df, days_offset=self.days_rolling_window_int.value, normalise=self.normalise_rolling_results_checkbox.value)
+            fig, box_fig, violin_fig = self.create_rolling_plot(df, days_offset=self.days_rolling_window_int.value, normalise=self.normalise_rolling_results_checkbox.value)
+            box_fig.show()
+            violin_fig.show()
             fig.show()
     #endregion

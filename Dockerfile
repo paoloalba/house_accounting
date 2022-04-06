@@ -3,10 +3,7 @@ FROM jupyter/scipy-notebook:python-3.9.10 as base
 RUN pip install nb_black
 RUN pip install plotly
 RUN pip install ipywidgets==8.0.0rc0
-
-USER root
-RUN locale-gen it_IT
-USER jovyan
+RUN pip install pandarallel
 
 FROM base as debug
 RUN pip install ptvsd
