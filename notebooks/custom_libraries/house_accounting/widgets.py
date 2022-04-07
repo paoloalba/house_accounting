@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from house_accounting.models import Cashflow, MainCategory, SubCategory, Tag
 from house_accounting.enumerators import MainCategory as EnumMainCat
 from house_accounting.enumerators import SubCategory as EnumSubCat
+from house_accounting.enumerators import TimeCategory as EnumTimeCat
 from house_accounting.enumerators import SampleFrequency
 
 class WidgetBase:
@@ -287,56 +288,8 @@ class AccountingDBManager(WidgetBase):
         super().display()
         self.show_db(None)
 
-    def get_df(
-        self,
-        aggregate_tags=True,
-        normalised_by_tags=False,
-        add_amount_sign=True
-        ):
-        df = pd.read_sql(
-            select(Cashflow, MainCategory, SubCategory, Tag)
-            .join(Cashflow.main_category)
-            .join(Cashflow.sub_category)
-            .join(Tag, Cashflow.tags),
-            self.db_engine,
-        )
-
-        cols_to_drop = []
-        cols_to_drop.append("main_category_id")
-        cols_to_drop.append("sub_category_id")
-        cols_to_drop.append("id_1")
-        cols_to_drop.append("id_2")
-        cols_to_drop.append("id_3")
-        df.drop(cols_to_drop, inplace=True, axis=1)
-
-        if aggregate_tags or normalised_by_tags:
-            unique_cols = df.columns.tolist()
-            unique_cols.remove("tag")
-
-            row_list = []
-            for kkk, ddd in df.groupby("id"):
-                if aggregate_tags:
-                    singleton = ddd.drop_duplicates(subset=unique_cols)
-                    if len(singleton.index) != 1:
-                        raise Exception("there are some unexpected duplicates")
-                    singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(sorted(ddd.tag.tolist()))
-                    row_list.append(singleton)
-                else:
-                    ddd["amount"] = ddd["amount"].apply(lambda x: x/len(ddd.index))
-                    row_list.append(ddd)
-            df = pd.concat(row_list)
-
-        df.sort_values("date", inplace=True, axis=0, ignore_index=True, ascending=False)
-        df.rename(columns={"category":"main_category", "category_1":"sub_category"}, inplace=True)
-
-        if add_amount_sign:
-            df["amount"] = df.apply(
-                lambda x: x.amount if x.main_category == EnumMainCat.Income.name else -x.amount, axis=1
-            )
-
-        return df
     def get_filtered_df(self):
-        df = self.get_df()
+        df = self.acc_table.get_df()
         return self.filter_df(df)
 
     @staticmethod
@@ -582,13 +535,13 @@ class AccountingDBManager(WidgetBase):
             session.commit()
         self.show_db(None)
     def show_db(self, _):
-        df = self.get_df()
+        df = self.acc_table.get_df()
         df, past_df, min_date = self.filter_df(df)
         base_amnt = past_df.amount.sum()
 
         net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days = AccountingDBManager.get_income_analysis(df)
 
-        norm_df = df[(df.sub_category != EnumSubCat.Exceptional.name) & (df.sub_category != EnumSubCat.OneTime.name)]
+        norm_df = df[(df.time_category != EnumTimeCat.Exceptional.name) & (df.time_category != EnumTimeCat.OneTime.name)]
         norm_net_income, norm_net_outcome, _, _, _, _ = AccountingDBManager.get_income_analysis(norm_df)
 
         self.output_window.clear_output()
@@ -707,10 +660,10 @@ class AccountingDBManager(WidgetBase):
             fig.show()
 
             ### SunBurst
-            df = self.get_df(aggregate_tags=False, normalised_by_tags=True, add_amount_sign=False)
+            df = self.acc_table.get_df(aggregate_tags=False, normalised_by_tags=True, add_amount_sign=False)
             df, past_df, min_date = self.filter_df(df)
 
-            fig = px.sunburst(df, path=["main_category", "sub_category", "tag"], values="amount")
+            fig = px.sunburst(df, path=["main_category", "sub_category", "time_category", "tag"], values="amount")
             fig.show()
 
             df, past_df, min_date = self.get_filtered_df()

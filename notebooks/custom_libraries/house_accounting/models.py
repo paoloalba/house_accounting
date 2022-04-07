@@ -1,3 +1,4 @@
+from enum import Enum
 from sqlalchemy import MetaData, Table, Column, Integer, String, Float, Date, ForeignKey
 from sqlalchemy import select
 
@@ -125,6 +126,8 @@ class Cashflow(Base):
             for eee in input_obj:
                 sel_filter.append(Cashflow.get_filter(eee, comparison_dict=comparison_dict))
             sel_filter = list(set(sel_filter))
+        elif isinstance(input_obj, Enum):
+            sel_filter = input_obj.name
         else:
             raise Exception(f"Impossible to find filter for object {input_obj} with comparison dictionary {comparison_dict}")
         

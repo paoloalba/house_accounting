@@ -9,12 +9,10 @@ class SubCategory(Enum):
     House = 1
     Salary = 2
     Generic = 3
-    OneTime = 4
-    Exceptional = 6
-    Food = 7
-    Transport = 8
-    Health = 9
-    Travel = 10
+    Food = 4
+    Transport = 5
+    Health = 6
+    Travel = 7
 
 class TimeCategory(Enum):
     Recurring = 1

@@ -11,9 +11,10 @@ from locale import setlocale, LC_ALL, locale_alias, resetlocale
 from contextlib import contextmanager
 from sqlalchemy.sql import select
 
-from house_accounting.models import Base, Cashflow, MainCategory, SubCategory, Tag
+from house_accounting.models import Base, Cashflow, MainCategory, SubCategory, TimeCategory, Tag
 from house_accounting.enumerators import MainCategory as EnumMainCategory
 from house_accounting.enumerators import SubCategory as EnumSubCategory
+from house_accounting.enumerators import TimeCategory as EnumTimeCategory
 
 @contextmanager
 def override_locale(locale_string):
@@ -46,11 +47,15 @@ class AccountingTable:
 
     def get_df(
         self,
+        aggregate_tags=True,
+        normalised_by_tags=False,
+        add_amount_sign=True
         ):
         df = pd.read_sql(
-            select(Cashflow, MainCategory, SubCategory, Tag)
+            select(Cashflow, MainCategory, SubCategory, TimeCategory, Tag)
             .join(Cashflow.main_category)
             .join(Cashflow.sub_category)
+            .join(Cashflow.time_category)
             .join(Tag, Cashflow.tags),
             self.db_engine,
         )
@@ -58,26 +63,38 @@ class AccountingTable:
         cols_to_drop = []
         cols_to_drop.append("main_category_id")
         cols_to_drop.append("sub_category_id")
+        cols_to_drop.append("time_category_id")
         cols_to_drop.append("id_1")
         cols_to_drop.append("id_2")
         cols_to_drop.append("id_3")
+        cols_to_drop.append("id_4")
         df.drop(cols_to_drop, inplace=True, axis=1)
 
-        unique_cols = df.columns.tolist()
-        unique_cols.remove("tag")
+        if aggregate_tags or normalised_by_tags:
+            unique_cols = df.columns.tolist()
+            unique_cols.remove("tag")
 
-        row_list = []
-        grp_df = df.groupby("id")
-        for kkk, ddd in grp_df:
-            singleton = ddd.drop_duplicates(subset=unique_cols)
-            if len(singleton.index) != 1:
-                raise Exception("there are some unexpected duplicates")
-            singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(sorted(ddd.tag.tolist()))
-            row_list.append(singleton)
-        df = pd.concat(row_list)
+            row_list = []
+            for kkk, ddd in df.groupby("id"):
+                if aggregate_tags:
+                    singleton = ddd.drop_duplicates(subset=unique_cols)
+                    if len(singleton.index) != 1:
+                        raise Exception("there are some unexpected duplicates")
+                    singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(sorted(ddd.tag.tolist()))
+                    row_list.append(singleton)
+                else:
+                    ddd["amount"] = ddd["amount"].apply(lambda x: x/len(ddd.index))
+                    row_list.append(ddd)
+            df = pd.concat(row_list)
+
 
         df.sort_values("date", inplace=True, axis=0, ignore_index=True)
-        df.rename(columns={"category":"main_category", "category_1":"sub_category"}, inplace=True)
+        df.rename(columns={"category":"main_category", "category_1":"sub_category", "category_2":"time_category"}, inplace=True)
+
+        if add_amount_sign:
+            df["amount"] = df.apply(
+                lambda x: x.amount if x.main_category == EnumMainCategory.Income.name else -x.amount, axis=1
+            )
 
         return df
 
@@ -122,7 +139,6 @@ class AccountingTable:
         end_date = date.today().replace(day=27)
         start_date = end_date.replace(year=end_date.year - 2)
 
-        all_dates = pd.date_range(start=start_date, end=end_date).to_pydatetime()
 
         with Session(self.db_engine) as session:
             cfl_entry = Cashflow(
@@ -132,6 +148,7 @@ class AccountingTable:
                 description="initial cashflow",
                 main_category=EnumMainCategory.Income.name,
                 sub_category=EnumSubCategory.Initial.name,
+                time_category=EnumTimeCategory.Exceptional.name,
                 tags=["initial"],
             )
             session.add(cfl_entry)
@@ -145,42 +162,62 @@ class AccountingTable:
                     description=f"salary for {ref_date:%b %y}",
                     main_category=EnumMainCategory.Income.name,
                     sub_category=EnumSubCategory.Salary.name,
-                    tags=["salary"],
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["user_1"],
                 )
                 session.add(cfl_entry)
-                ref_date += pd.DateOffset(months=1)
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=ref_date,
+                    amount=1300,
+                    description=f"salary for {ref_date:%b %y}",
+                    main_category=EnumMainCategory.Income.name,
+                    sub_category=EnumSubCategory.Salary.name,
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["user_2"],
+                )
+                session.add(cfl_entry)
 
-                prob_func = lambda x: 1/x**(1/2)
-                prob_func = np.vectorize(prob_func)
                 chc_arr = np.arange(0.1, 100, step=0.1)
                 chc_arr = np.append(chc_arr, np.arange(100, 1000, step=10))
                 chc_arr = np.append(chc_arr, np.arange(1000, 10000, step=100))
 
-                sum_invers = np.sum(prob_func(chc_arr))
-                probs=[prob_func(ppp)/sum_invers for ppp in chc_arr]
+                # prob_func = lambda x: 1/x**(1/2)
+                # prob_func = np.vectorize(prob_func)
+                # sum_invers = np.sum(prob_func(chc_arr))
+                # probs=[prob_func(ppp)/sum_invers for ppp in chc_arr]
 
+                month_start = (ref_date + pd.offsets.MonthEnd(0) - pd.offsets.MonthBegin(1)).floor("d")
+                month_end = (ref_date + pd.offsets.MonthEnd(0)).floor("d")
+                all_dates = pd.date_range(start=month_start, end=month_end).to_pydatetime()
                 for iii in range(np.random.randint(10)):
+                    sel_cashflow_dir = np.random.choice([EnumMainCategory.Income, EnumMainCategory.Outcome], p=[0.05, 0.95])
                     # sel_value = np.random.choice(chc_arr, p=probs)
                     sel_value = np.random.choice(chc_arr)
                     sel_date = np.random.choice(all_dates)
 
+                    sel_sub_cat = np.random.choice(list(EnumSubCategory))
+
                     if sel_value > 1000:
-                        sel_sub_cat = EnumSubCategory.Exceptional
+                        sel_time_cat = EnumTimeCategory.Exceptional
                     elif sel_value > 100:
-                        sel_sub_cat = EnumSubCategory.OneTime
+                        sel_time_cat = EnumTimeCategory.OneTime
                     else:
-                        sel_sub_cat = EnumSubCategory.Generic
+                        sel_time_cat = EnumTimeCategory.Recurring
 
                     cfl_entry = Cashflow(
                         session=session,
                         date=sel_date,
                         amount=sel_value,
-                        description=f"outcome",
-                        main_category=EnumMainCategory.Outcome.name,
+                        description=f"some random cashflow",
+                        main_category=sel_cashflow_dir.name,
                         sub_category=sel_sub_cat.name,
-                        tags=["outcome"],
+                        time_category=sel_time_cat.name,
+                        tags=["random"],
                     )
                     session.add(cfl_entry)
+
+                ref_date += pd.DateOffset(months=1)
 
             session.commit()
     #endregion
