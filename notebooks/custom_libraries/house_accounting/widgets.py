@@ -14,6 +14,7 @@ from house_accounting.enumerators import SubCategory as EnumSubCat
 from house_accounting.enumerators import TimeCategory as EnumTimeCat
 from house_accounting.enumerators import SampleFrequency
 
+
 class WidgetBase:
     def __init__(self, base_dir) -> None:
         self.main_element = None
@@ -22,13 +23,11 @@ class WidgetBase:
     def display(self):
         display(self.main_element)
 
+
 class AccountingDBManager(WidgetBase):
     tags_sep = ";"
-    def __init__(
-        self,
-        base_dir,
-        acc_table
-        ) -> None:
+
+    def __init__(self, base_dir, acc_table) -> None:
         super().__init__(base_dir)
 
         self.acc_table = acc_table
@@ -39,7 +38,7 @@ class AccountingDBManager(WidgetBase):
 
         button_layout = widgets.Layout(width="auto", height="auto")
 
-        #region Left Box
+        # region Left Box
         clear_fields_button = widgets.Button(
             description="Clear all fields",
             disabled=False,
@@ -121,7 +120,7 @@ class AccountingDBManager(WidgetBase):
         self.amount_text = widgets.FloatText(
             value=0,
             step=0.01,
-            description='Cashflow Amount:',
+            description="Cashflow Amount:",
             disabled=False,
             style=dict(description_width="initial"),
         )
@@ -166,7 +165,7 @@ class AccountingDBManager(WidgetBase):
         self.sample_frq_dropdown = widgets.Dropdown(
             options=[(eee.name, eee) for eee in SampleFrequency],
             value=SampleFrequency.Daily,
-            description='Sample Frequency:',
+            description="Sample Frequency:",
             style=dict(description_width="initial"),
         )
         left_box_list.append(self.sample_frq_dropdown)
@@ -206,7 +205,10 @@ class AccountingDBManager(WidgetBase):
         left_box_list.append(self.tags_db_entries)
 
         self.overwrite_entry_checkbox = widgets.Checkbox(
-            value=True, description="Overwrite Entry Values", disabled=False, indent=False
+            value=True,
+            description="Overwrite Entry Values",
+            disabled=False,
+            indent=False,
         )
         left_box_list.append(self.overwrite_entry_checkbox)
         self.delete_entry_checkbox = widgets.Checkbox(
@@ -231,10 +233,10 @@ class AccountingDBManager(WidgetBase):
 
         self.days_rolling_window_int = widgets.IntText(
             value=30,
-            description='Days rolling window:',
+            description="Days rolling window:",
             disabled=False,
             style=dict(description_width="initial"),
-        )        
+        )
         left_box_list.append(self.days_rolling_window_int)
         self.normalise_rolling_results_checkbox = widgets.Checkbox(
             value=False, description="Normalise to days", disabled=False, indent=False
@@ -245,7 +247,7 @@ class AccountingDBManager(WidgetBase):
                 value="<hr>",
             )
         )
-        
+
         create_backupt_button = widgets.Button(
             description="Create DB backup",
             disabled=False,
@@ -255,28 +257,33 @@ class AccountingDBManager(WidgetBase):
             layout=button_layout,
         )
         left_box_list.append(create_backupt_button)
-        #endregion
-        #region Right Box
-        self.output_window = widgets.Output(layout=widgets.Layout(
-            width="740px",
-            overflow_x="scroll",
-            height="400px",
-            overflow_y="scroll",
-        ))
+        # endregion
+        # region Right Box
+        self.output_window = widgets.Output(
+            layout=widgets.Layout(
+                width="740px",
+                overflow_x="scroll",
+                height="400px",
+                overflow_y="scroll",
+            )
+        )
         right_box_list.append(self.output_window)
-        #endregion
+        # endregion
 
         left_box = widgets.VBox(left_box_list)
         right_box = widgets.VBox(right_box_list)
 
         self.draw_output_window = widgets.Output(
             layout=widgets.Layout(
-            overflow_x="scroll",
-            height="400px",
-            overflow_y="scroll",
-        ))
+                overflow_x="scroll",
+                height="400px",
+                overflow_y="scroll",
+            )
+        )
 
-        self.main_element = widgets.VBox([widgets.HBox([left_box, right_box]),self.draw_output_window])
+        self.main_element = widgets.VBox(
+            [widgets.HBox([left_box, right_box]), self.draw_output_window]
+        )
 
         show_db_button.on_click(self.show_db)
         add_row_button.on_click(self.add_row)
@@ -296,20 +303,23 @@ class AccountingDBManager(WidgetBase):
     def match_tags(input_tags, target_tags):
         if isinstance(input_tags, str):
             input_tags = input_tags.split(AccountingDBManager.tags_sep)
-        
+
         for iii in input_tags:
             if iii in target_tags:
                 return True
         return False
 
     def are_input_tags(self):
-        return len(self.tags_field.value) > 0 or len(self.tag_multiselect.value) > 0 
+        return len(self.tags_field.value) > 0 or len(self.tag_multiselect.value) > 0
+
     def get_input_tags_list(self, extend_tag_options=False):
         tag_list = []
         if len(self.tags_field.value) > 0:
             tag_list = self.tags_field.value.split(AccountingDBManager.tags_sep)
             if len(tag_list) > 0 and extend_tag_options:
-                self.tag_multiselect.allowed_tags = sorted(list(set(self.tag_multiselect.allowed_tags + tag_list)))
+                self.tag_multiselect.allowed_tags = sorted(
+                    list(set(self.tag_multiselect.allowed_tags + tag_list))
+                )
         tag_list.extend(self.tag_multiselect.value)
         return tag_list
 
@@ -330,10 +340,20 @@ class AccountingDBManager(WidgetBase):
         if self.sub_category_combobox.value:
             df = df[df.sub_category == self.sub_category_combobox.value]
         if self.are_input_tags():
-            df = df[df.tag.apply(lambda x: AccountingDBManager.match_tags(x, self.get_input_tags_list()))]
+            df = df[
+                df.tag.apply(
+                    lambda x: AccountingDBManager.match_tags(
+                        x, self.get_input_tags_list()
+                    )
+                )
+            ]
 
         if self.description_text.value:
-            df = df[df.description.apply(lambda x: x.lower()).str.contains(self.description_text.value)]
+            df = df[
+                df.description.apply(lambda x: x.lower()).str.contains(
+                    self.description_text.value
+                )
+            ]
 
         return df, past_df, min_date
 
@@ -355,21 +375,23 @@ class AccountingDBManager(WidgetBase):
         elif frq == SampleFrequency.Daily:
             pass
         elif frq == SampleFrequency.Quarterly:
-            while (current_date.month-1)//3 == (input_date.month-1)//3:
+            while (current_date.month - 1) // 3 == (input_date.month - 1) // 3:
                 current_date = input_date
                 input_date += timedelta(days=1)
         else:
             raise Exception("Unrecognised sample frequency")
-        
+
         return current_date
 
     @staticmethod
     def diff_year(d1, d2):
         tot_days = (d1 - d2).days
         return tot_days / 365
+
     @staticmethod
     def diff_month(d1, d2):
         return (d1.year - d2.year) * 12 + d1.month - d2.month + 1
+
     @staticmethod
     def diff_week(d2, d1):
         monday1 = d1 - timedelta(days=d1.weekday())
@@ -389,7 +411,9 @@ class AccountingDBManager(WidgetBase):
             .apply(lambda x: x.amount.sum())
             .rename(f"income-{ofs}")
         )
-        all_ser.append(fil_df.groupby("date").apply(lambda x: x.amount.sum()).rename(f"net-{ofs}"))
+        all_ser.append(
+            fil_df.groupby("date").apply(lambda x: x.amount.sum()).rename(f"net-{ofs}")
+        )
         all_ser.append(
             fil_df[fil_df.main_category == "Outcome"]
             .groupby("date")
@@ -428,31 +452,37 @@ class AccountingDBManager(WidgetBase):
             fact = 2
             min_y = min(min_y, mu - fact * sigma)
             max_y = max(max_y, mu + fact * sigma)
-            print(f"{ser.name:<15}: {mu:,.2f}" + " \u00B1 " + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}")
+            print(
+                f"{ser.name:<15}: {mu:,.2f}"
+                + " \u00B1 "
+                + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}"
+            )
 
-            box_fig.add_trace(go.Box(y=s1.values, name=ser.name, boxmean='sd'))
+            box_fig.add_trace(go.Box(y=s1.values, name=ser.name, boxmean="sd"))
 
-            violin_fig.add_trace(go.Violin(
-                                    y=s1.values,
-                                    name=ser.name,
-                                    box_visible=False,
-                                    meanline_visible=True))            
+            violin_fig.add_trace(
+                go.Violin(
+                    y=s1.values, name=ser.name, box_visible=False, meanline_visible=True
+                )
+            )
 
         fig.update_layout(hovermode="x", yaxis_range=[0, max_y])
         box_fig.update_layout(
             # autosize=False,
             width=700,
-            height=800,)
+            height=800,
+        )
         violin_fig.update_layout(
             # autosize=False,
             width=700,
-            height=800,)
+            height=800,
+        )
         return fig, box_fig, violin_fig
 
     @staticmethod
     def get_income_analysis(input_df):
         if len(input_df.index) == 0:
-            return 0,0,1,1,1,1
+            return 0, 0, 1, 1, 1, 1
 
         tmp_max_date = input_df.date.max()
         tmp_min_date = input_df.date.min()
@@ -462,8 +492,12 @@ class AccountingDBManager(WidgetBase):
         tot_weeks = AccountingDBManager.diff_week(tmp_max_date, tmp_min_date)
         tot_days = (tmp_max_date - tmp_min_date).days
 
-        net_income = input_df[input_df.main_category == EnumMainCat.Income.name].amount.sum()
-        net_outcome = input_df[input_df.main_category == EnumMainCat.Outcome.name].amount.sum()
+        net_income = input_df[
+            input_df.main_category == EnumMainCat.Income.name
+        ].amount.sum()
+        net_outcome = input_df[
+            input_df.main_category == EnumMainCat.Outcome.name
+        ].amount.sum()
 
         in_df = input_df[input_df.sub_category == "Initial"]
         if len(in_df.index) > 0:
@@ -471,9 +505,10 @@ class AccountingDBManager(WidgetBase):
 
         return net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days
 
-    #region Button actions
+    # region Button actions
     def create_backupt(self, _):
         self.acc_table.create_backup()
+
     def clear_fields(self, _):
         self.date_picker.value = None
         self.amount_text.value = 0
@@ -488,6 +523,7 @@ class AccountingDBManager(WidgetBase):
 
         self.min_date_picker.value = None
         self.max_date_picker.value = None
+
     def update_entries(self, _):
 
         sel_ids = [int(eee.split("-")[0]) for eee in self.select_db_entries.value]
@@ -508,11 +544,17 @@ class AccountingDBManager(WidgetBase):
                         ccc.description = self.description_text.value
 
                     if self.main_category_combobox.value:
-                        ccc.main_category = Cashflow.project_element(session, self.main_category_combobox.value, "main_category")
+                        ccc.main_category = Cashflow.project_element(
+                            session, self.main_category_combobox.value, "main_category"
+                        )
                     if self.sub_category_combobox.value:
-                        ccc.sub_category = Cashflow.project_element(session, self.sub_category_combobox.value, "sub_category")
+                        ccc.sub_category = Cashflow.project_element(
+                            session, self.sub_category_combobox.value, "sub_category"
+                        )
                     if self.are_input_tags():
-                        tag_list = Cashflow.project_element(session, self.get_input_tags_list(), "tags")
+                        tag_list = Cashflow.project_element(
+                            session, self.get_input_tags_list(), "tags"
+                        )
                         if self.overwrite_entry_checkbox.value:
                             ccc.tags = tag_list
                         else:
@@ -520,6 +562,7 @@ class AccountingDBManager(WidgetBase):
                             ccc.tags = list(set(tag_list))
             session.commit()
         self.show_db(None)
+
     def add_row(self, _):
         with Session(self.db_engine) as session:
             cfl_entry = Cashflow(
@@ -534,15 +577,33 @@ class AccountingDBManager(WidgetBase):
             session.add(cfl_entry)
             session.commit()
         self.show_db(None)
+
     def show_db(self, _):
         df = self.acc_table.get_df()
         df, past_df, min_date = self.filter_df(df)
         base_amnt = past_df.amount.sum()
 
-        net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days = AccountingDBManager.get_income_analysis(df)
+        (
+            net_income,
+            net_outcome,
+            frac_years,
+            tot_months,
+            tot_weeks,
+            tot_days,
+        ) = AccountingDBManager.get_income_analysis(df)
 
-        norm_df = df[(df.time_category != EnumTimeCat.Exceptional.name) & (df.time_category != EnumTimeCat.OneTime.name)]
-        norm_net_income, norm_net_outcome, _, _, _, _ = AccountingDBManager.get_income_analysis(norm_df)
+        norm_df = df[
+            (df.time_category != EnumTimeCat.Exceptional.name)
+            & (df.time_category != EnumTimeCat.OneTime.name)
+        ]
+        (
+            norm_net_income,
+            norm_net_outcome,
+            _,
+            _,
+            _,
+            _,
+        ) = AccountingDBManager.get_income_analysis(norm_df)
 
         self.output_window.clear_output()
         with self.output_window:
@@ -552,8 +613,9 @@ class AccountingDBManager(WidgetBase):
                     if x > 0
                     else "font-weight: bold; color: red",
                     subset=pd.IndexSlice[:, ["amount"]],
-                ).format('{:,.2f}', na_rep='MISS', subset=pd.IndexSlice[:, ["amount"]]
-                ).apply(
+                )
+                .format("{:,.2f}", na_rep="MISS", subset=pd.IndexSlice[:, ["amount"]])
+                .apply(
                     lambda x: [
                         "background: #b3ffb3;"
                         if x["main_category"] == EnumMainCat.Income.name
@@ -564,38 +626,49 @@ class AccountingDBManager(WidgetBase):
                 )
             )
             cell_hover = {  # for row hover use <tr> instead of <td>
-                'selector': 'td:hover',
-                'props': [('background-color', '#ffffb3')]
+                "selector": "td:hover",
+                "props": [("background-color", "#ffffb3")],
             }
             styled_df.set_table_styles([cell_hover])
 
             ttips = df.apply(
-                lambda x: pd.Series(
-                    [x.tag] * len(x.index), index=df.columns
-                ),
+                lambda x: pd.Series([x.tag] * len(x.index), index=df.columns),
                 axis=1,
             )
             styled_df.set_tooltips(ttips)
             df.drop(["tag"], inplace=True, axis=1)
 
             with pd.option_context(
-                'display.max_rows', None,
-                'display.max_columns', None):
+                "display.max_rows", None, "display.max_columns", None
+            ):
                 display(styled_df)
 
         df.sort_values("id", inplace=True, axis=0, ignore_index=True)
-        self.select_db_entries.options = df.apply(lambda x: f"{x.id}-{x.description[:7]}-{x.main_category}-{x.sub_category}", axis=1)
+        self.select_db_entries.options = df.apply(
+            lambda x: f"{x.id}-{x.description[:7]}-{x.main_category}-{x.sub_category}",
+            axis=1,
+        )
         self.tags_db_entries.allowed_tags = self.select_db_entries.options
 
         self.draw_output_window.clear_output()
         with self.draw_output_window:
-            df.date = df.date.apply(lambda x: AccountingDBManager.go_to_end_of(x, self.sample_frq_dropdown.value))
-            ser = df.groupby("date").apply(lambda x: x.amount.sum()).rename("bank account")
+            df.date = df.date.apply(
+                lambda x: AccountingDBManager.go_to_end_of(
+                    x, self.sample_frq_dropdown.value
+                )
+            )
+            ser = (
+                df.groupby("date")
+                .apply(lambda x: x.amount.sum())
+                .rename("bank account")
+            )
             ser.sort_index(inplace=True)
             ser_cum_sum = ser.cumsum()
 
             print(f"Base on {min_date:%d-%m-%Y}: {base_amnt:,.2f}")
-            print(f"Saldo on {ser_cum_sum.index[-1]:%d-%m-%Y}: {ser_cum_sum[-1]:,.2f} ({ser_cum_sum[-1]+base_amnt:,.2f})")
+            print(
+                f"Saldo on {ser_cum_sum.index[-1]:%d-%m-%Y}: {ser_cum_sum[-1]:,.2f} ({ser_cum_sum[-1]+base_amnt:,.2f})"
+            )
             dict_1 = {}
             dict_1["Yearly"] = {"value": frac_years, "fmt": ".2f"}
             dict_1["Monthly"] = {"value": tot_months, "fmt": "d"}
@@ -603,16 +676,22 @@ class AccountingDBManager(WidgetBase):
             dict_1["Daily"] = {"value": tot_days, "fmt": "d"}
             for kkk, vvv in dict_1.items():
                 tmp_s = f'{kkk:<7}({vvv["value"]:{vvv["fmt"]}})'
-                print(f'{tmp_s:<15} Income/Outcome/Net: {net_income/vvv["value"]:,.2f}, {net_outcome/vvv["value"]:,.2f}, {(net_income+net_outcome)/vvv["value"]:,.2f}')
+                print(
+                    f'{tmp_s:<15} Income/Outcome/Net: {net_income/vvv["value"]:,.2f}, {net_outcome/vvv["value"]:,.2f}, {(net_income+net_outcome)/vvv["value"]:,.2f}'
+                )
 
             print("--- Just with normal cashflows ---")
-            print(f"Saldo on {norm_df.date.max():%d-%m-%Y}: {norm_df.amount.sum():,.2f} ({norm_df.amount.sum()+base_amnt:,.2f})")
+            print(
+                f"Saldo on {norm_df.date.max():%d-%m-%Y}: {norm_df.amount.sum():,.2f} ({norm_df.amount.sum()+base_amnt:,.2f})"
+            )
             for kkk, vvv in dict_1.items():
                 tmp_s = f'{kkk:<7}({vvv["value"]:{vvv["fmt"]}})'
-                print(f'{tmp_s:<15} Income/Outcome/Net: {norm_net_income/vvv["value"]:,.2f}, {norm_net_outcome/vvv["value"]:,.2f}, {(norm_net_income+norm_net_outcome)/vvv["value"]:,.2f}')
+                print(
+                    f'{tmp_s:<15} Income/Outcome/Net: {norm_net_income/vvv["value"]:,.2f}, {norm_net_outcome/vvv["value"]:,.2f}, {(norm_net_income+norm_net_outcome)/vvv["value"]:,.2f}'
+                )
 
             fig = px.line(ser_cum_sum + base_amnt)
-            fig.show()            
+            fig.show()
 
             ### Waterfall
             years = []
@@ -625,7 +704,7 @@ class AccountingDBManager(WidgetBase):
             for ido, vvv in ser.iteritems():
                 if vvv != 0:
                     years.append(ido.year)
-                    quarters.append(f'q{(ido.month-1)//3 + 1} - {ido.year}')
+                    quarters.append(f"q{(ido.month-1)//3 + 1} - {ido.year}")
                     months.append(f'{ido.strftime("%b")} - {ido.year}')
                     weeks.append(f"{ido.isocalendar().week} - {ido.year}")
                     days.append(f"{ido.timetuple().tm_yday} - {ido.year}")
@@ -660,15 +739,26 @@ class AccountingDBManager(WidgetBase):
             fig.show()
 
             ### SunBurst
-            df = self.acc_table.get_df(aggregate_tags=False, normalised_by_tags=True, add_amount_sign=False)
+            df = self.acc_table.get_df(
+                aggregate_tags=False, normalised_by_tags=True, add_amount_sign=False
+            )
             df, past_df, min_date = self.filter_df(df)
 
-            fig = px.sunburst(df, path=["main_category", "sub_category", "time_category", "tag"], values="amount")
+            fig = px.sunburst(
+                df,
+                path=["main_category", "sub_category", "time_category", "tag"],
+                values="amount",
+            )
             fig.show()
 
             df, past_df, min_date = self.get_filtered_df()
-            fig, box_fig, violin_fig = self.create_rolling_plot(df, days_offset=self.days_rolling_window_int.value, normalise=self.normalise_rolling_results_checkbox.value)
+            fig, box_fig, violin_fig = self.create_rolling_plot(
+                df,
+                days_offset=self.days_rolling_window_int.value,
+                normalise=self.normalise_rolling_results_checkbox.value,
+            )
             box_fig.show()
             violin_fig.show()
             fig.show()
-    #endregion
+
+    # endregion

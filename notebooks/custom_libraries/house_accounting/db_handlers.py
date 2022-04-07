@@ -11,10 +11,18 @@ from locale import setlocale, LC_ALL, locale_alias, resetlocale
 from contextlib import contextmanager
 from sqlalchemy.sql import select
 
-from house_accounting.models import Base, Cashflow, MainCategory, SubCategory, TimeCategory, Tag
+from house_accounting.models import (
+    Base,
+    Cashflow,
+    MainCategory,
+    SubCategory,
+    TimeCategory,
+    Tag,
+)
 from house_accounting.enumerators import MainCategory as EnumMainCategory
 from house_accounting.enumerators import SubCategory as EnumSubCategory
 from house_accounting.enumerators import TimeCategory as EnumTimeCategory
+
 
 @contextmanager
 def override_locale(locale_string):
@@ -22,35 +30,37 @@ def override_locale(locale_string):
     yield
     resetlocale(LC_ALL)
 
-class AccountingTable:
 
+class AccountingTable:
     def __init__(self, db_path) -> None:
         self.db_path = db_path
 
         self.db_engine = self.get_db_engine(future=False)
 
-    #region Helper methods
+    # region Helper methods
     def get_db_engine(self, future=True):
-        engine = create_engine(f"sqlite+pysqlite:///{self.db_path}", echo=False, future=future)
+        engine = create_engine(
+            f"sqlite+pysqlite:///{self.db_path}", echo=False, future=future
+        )
         Base.metadata.create_all(engine)
         return engine
+
     @staticmethod
     def parse_amount(input_str):
         return float(input_str.replace(".", "").replace(",", "."))
+
     @staticmethod
     def parse_date(input_str):
         try:
             return datetime.strptime(input_str, "%d %b '%y")
         except:
             return datetime.strptime(input_str, "%d %b %y")
-    #endregion
+
+    # endregion
 
     def get_df(
-        self,
-        aggregate_tags=True,
-        normalised_by_tags=False,
-        add_amount_sign=True
-        ):
+        self, aggregate_tags=True, normalised_by_tags=False, add_amount_sign=True
+    ):
         df = pd.read_sql(
             select(Cashflow, MainCategory, SubCategory, TimeCategory, Tag)
             .join(Cashflow.main_category)
@@ -80,28 +90,36 @@ class AccountingTable:
                     singleton = ddd.drop_duplicates(subset=unique_cols)
                     if len(singleton.index) != 1:
                         raise Exception("there are some unexpected duplicates")
-                    singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(sorted(ddd.tag.tolist()))
+                    singleton.loc[singleton.iloc[0].name, "tag"] = ";".join(
+                        sorted(ddd.tag.tolist())
+                    )
                     row_list.append(singleton)
                 else:
-                    ddd["amount"] = ddd["amount"].apply(lambda x: x/len(ddd.index))
+                    ddd["amount"] = ddd["amount"].apply(lambda x: x / len(ddd.index))
                     row_list.append(ddd)
             df = pd.concat(row_list)
 
-
         df.sort_values("date", inplace=True, axis=0, ignore_index=True)
-        df.rename(columns={"category":"main_category", "category_1":"sub_category", "category_2":"time_category"}, inplace=True)
+        df.rename(
+            columns={
+                "category": "main_category",
+                "category_1": "sub_category",
+                "category_2": "time_category",
+            },
+            inplace=True,
+        )
 
         if add_amount_sign:
             df["amount"] = df.apply(
-                lambda x: x.amount if x.main_category == EnumMainCategory.Income.name else -x.amount, axis=1
+                lambda x: x.amount
+                if x.main_category == EnumMainCategory.Income.name
+                else -x.amount,
+                axis=1,
             )
 
         return df
 
-    def overwrite_db_with_df(
-        self,
-        input_df
-    ):
+    def overwrite_db_with_df(self, input_df):
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
@@ -124,13 +142,15 @@ class AccountingTable:
 
     def create_backup(self):
         base_name = os.path.basename(self.db_path)
-        base_name, extension = os.path.splitext(base_name)        
+        base_name, extension = os.path.splitext(base_name)
         dir_name = os.path.dirname(self.db_path)
 
-        new_name = os.path.join(dir_name, f"{base_name}-backup_{datetime.now():%Y%m%d%H%M}{extension}")
+        new_name = os.path.join(
+            dir_name, f"{base_name}-backup_{datetime.now():%Y%m%d%H%M}{extension}"
+        )
         shutil.copy(self.db_path, new_name)
 
-    #region generate default
+    # region generate default
     def generate_default_db(
         self,
     ):
@@ -138,7 +158,6 @@ class AccountingTable:
 
         end_date = date.today().replace(day=27)
         start_date = end_date.replace(year=end_date.year - 2)
-
 
         with Session(self.db_engine) as session:
             cfl_entry = Cashflow(
@@ -187,11 +206,18 @@ class AccountingTable:
                 # sum_invers = np.sum(prob_func(chc_arr))
                 # probs=[prob_func(ppp)/sum_invers for ppp in chc_arr]
 
-                month_start = (ref_date + pd.offsets.MonthEnd(0) - pd.offsets.MonthBegin(1)).floor("d")
+                month_start = (
+                    ref_date + pd.offsets.MonthEnd(0) - pd.offsets.MonthBegin(1)
+                ).floor("d")
                 month_end = (ref_date + pd.offsets.MonthEnd(0)).floor("d")
-                all_dates = pd.date_range(start=month_start, end=month_end).to_pydatetime()
+                all_dates = pd.date_range(
+                    start=month_start, end=month_end
+                ).to_pydatetime()
                 for iii in range(np.random.randint(10)):
-                    sel_cashflow_dir = np.random.choice([EnumMainCategory.Income, EnumMainCategory.Outcome], p=[0.05, 0.95])
+                    sel_cashflow_dir = np.random.choice(
+                        [EnumMainCategory.Income, EnumMainCategory.Outcome],
+                        p=[0.05, 0.95],
+                    )
                     # sel_value = np.random.choice(chc_arr, p=probs)
                     sel_value = np.random.choice(chc_arr)
                     sel_date = np.random.choice(all_dates)
@@ -220,4 +246,5 @@ class AccountingTable:
                 ref_date += pd.DateOffset(months=1)
 
             session.commit()
-    #endregion
+
+    # endregion
