@@ -261,7 +261,7 @@ class AccountingDBManager(WidgetBase):
         # region Right Box
         self.output_window = widgets.Output(
             layout=widgets.Layout(
-                width="740px",
+                width="800px",
                 overflow_x="scroll",
                 height="400px",
                 overflow_y="scroll",
@@ -652,6 +652,12 @@ class AccountingDBManager(WidgetBase):
 
         self.draw_output_window.clear_output()
         with self.draw_output_window:
+            tmp_init_df = df[df.sub_category == EnumSubCat.Initial.name]
+            if len(tmp_init_df.index) > 0:
+                base_amnt += tmp_init_df.amount.sum()
+                min_date = tmp_init_df.date.min()
+            df = df[~(df.sub_category == EnumSubCat.Initial.name)]
+
             df.date = df.date.apply(
                 lambda x: AccountingDBManager.go_to_end_of(
                     x, self.sample_frq_dropdown.value

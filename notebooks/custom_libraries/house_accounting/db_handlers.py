@@ -99,7 +99,7 @@ class AccountingTable:
                     row_list.append(ddd)
             df = pd.concat(row_list)
 
-        df.sort_values("date", inplace=True, axis=0, ignore_index=True)
+        df.sort_values("date", inplace=True, axis=0, ignore_index=True, ascending=False)
         df.rename(
             columns={
                 "category": "main_category",
@@ -197,15 +197,6 @@ class AccountingTable:
                 )
                 session.add(cfl_entry)
 
-                chc_arr = np.arange(0.1, 100, step=0.1)
-                chc_arr = np.append(chc_arr, np.arange(100, 1000, step=10))
-                chc_arr = np.append(chc_arr, np.arange(1000, 10000, step=100))
-
-                # prob_func = lambda x: 1/x**(1/2)
-                # prob_func = np.vectorize(prob_func)
-                # sum_invers = np.sum(prob_func(chc_arr))
-                # probs=[prob_func(ppp)/sum_invers for ppp in chc_arr]
-
                 month_start = (
                     ref_date + pd.offsets.MonthEnd(0) - pd.offsets.MonthBegin(1)
                 ).floor("d")
@@ -213,29 +204,33 @@ class AccountingTable:
                 all_dates = pd.date_range(
                     start=month_start, end=month_end
                 ).to_pydatetime()
-                for iii in range(np.random.randint(10)):
+                for iii in range(np.random.randint(2, 25)):
                     sel_cashflow_dir = np.random.choice(
                         [EnumMainCategory.Income, EnumMainCategory.Outcome],
                         p=[0.05, 0.95],
                     )
-                    # sel_value = np.random.choice(chc_arr, p=probs)
-                    sel_value = np.random.choice(chc_arr)
-                    sel_date = np.random.choice(all_dates)
-
                     sel_sub_cat = np.random.choice(list(EnumSubCategory))
+                    sel_time_cat = np.random.choice(
+                        [EnumTimeCategory.Exceptional, EnumTimeCategory.OneTime, EnumTimeCategory.Recurring],
+                        p=[0.01, 0.04, 0.95],
+                    )
 
-                    if sel_value > 1000:
-                        sel_time_cat = EnumTimeCategory.Exceptional
-                    elif sel_value > 100:
-                        sel_time_cat = EnumTimeCategory.OneTime
+                    sel_date = np.random.choice(all_dates)
+                    sel_value = np.random.uniform(low=0.01, high=10.0)
+                    if sel_time_cat == EnumTimeCategory.Exceptional:
+                        sel_value *= 1000
+                    elif sel_time_cat == EnumTimeCategory.OneTime:
+                        sel_value *= 100
+                    elif sel_time_cat == EnumTimeCategory.Recurring:
+                        sel_value *= 10
                     else:
-                        sel_time_cat = EnumTimeCategory.Recurring
+                        raise Exception(f"Unrecognised time category: {sel_time_cat}")
 
                     cfl_entry = Cashflow(
                         session=session,
                         date=sel_date,
                         amount=sel_value,
-                        description=f"some random cashflow",
+                        description=f"some random {sel_time_cat.name.lower()} cashflow for {sel_sub_cat.name.lower()}",
                         main_category=sel_cashflow_dir.name,
                         sub_category=sel_sub_cat.name,
                         time_category=sel_time_cat.name,
