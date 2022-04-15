@@ -11,7 +11,13 @@ from sqlalchemy.sql import select, delete
 from sqlalchemy.orm import Session
 from pandas.tseries.offsets import MonthEnd, Week
 
-from house_accounting.models import Cashflow, MainCategory, SubCategory, TimeCategory, Tag
+from house_accounting.models import (
+    Cashflow,
+    MainCategory,
+    SubCategory,
+    TimeCategory,
+    Tag,
+)
 from house_accounting.enumerators import MainCategory as EnumMainCat
 from house_accounting.enumerators import SubCategory as EnumSubCat
 from house_accounting.enumerators import TimeCategory as EnumTimeCat
@@ -828,53 +834,84 @@ class AccountingDBManager(WidgetBase):
 
             fig = go.Figure()
 
-            fig.add_trace(go.Scatter(x=ser_cum_sum.index,
-            y=ser_cum_sum.values + base_amnt,
-            line=dict(color='blue'),
-            hovertemplate = '%{y:,.2f} €',
-            name="bank account"))
+            fig.add_trace(
+                go.Scatter(
+                    x=ser_cum_sum.index,
+                    y=ser_cum_sum.values + base_amnt,
+                    line=dict(color="blue"),
+                    hovertemplate="%{y:,.2f} €",
+                    name="bank account",
+                )
+            )
 
-            fig.add_trace(go.Scatter(x=regr_df["predicted_mean"].index,
-            y=regr_df["predicted_mean"].values,
-            legendgroup="regression",
-            hovertemplate = '%{y:,.2f} €',
-            line=dict(color='green'),
-            name="regr mean"))
-            fig.add_trace(go.Scatter(x=regr_df["upper cashflow"].index,
-            y=regr_df["upper cashflow"].values,
-            line=dict(color='green'),
-            hovertemplate = '%{y:,.2f} €',
-            legendgroup="regression",
-            name="95% quantile"))
-            fig.add_trace(go.Scatter(x=regr_df["lower cashflow"].index,
-            y=regr_df["lower cashflow"].values,
-            line=dict(color='green'),
-            hovertemplate = '%{y:,.2f} €',
-            legendgroup="regression",
-            fill='tonexty',
-            name="5% quantile"))
+            fig.add_trace(
+                go.Scatter(
+                    x=regr_df["predicted_mean"].index,
+                    y=regr_df["predicted_mean"].values,
+                    legendgroup="regression",
+                    hovertemplate="%{y:,.2f} €",
+                    line=dict(color="green"),
+                    name="regr mean",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=regr_df["upper cashflow"].index,
+                    y=regr_df["upper cashflow"].values,
+                    line=dict(color="green"),
+                    hovertemplate="%{y:,.2f} €",
+                    legendgroup="regression",
+                    name="95% quantile",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=regr_df["lower cashflow"].index,
+                    y=regr_df["lower cashflow"].values,
+                    line=dict(color="green"),
+                    hovertemplate="%{y:,.2f} €",
+                    legendgroup="regression",
+                    fill="tonexty",
+                    name="5% quantile",
+                )
+            )
 
-            fig.add_trace(go.Scatter(x=forecast_df["predicted_mean"].index,
-            y=forecast_df["predicted_mean"].values,
-            legendgroup="forecast",
-            hovertemplate = '%{y:,.2f} €',
-            line=dict(color='red'),
-            name="forecast mean"))
-            fig.add_trace(go.Scatter(x=forecast_df["upper cashflow"].index,
-            y=forecast_df["upper cashflow"].values,
-            line=dict(color='red'),
-            hovertemplate = '%{y:,.2f} €',
-            legendgroup="forecast",
-            name="95% quantile"))
-            fig.add_trace(go.Scatter(x=forecast_df["lower cashflow"].index,
-            y=forecast_df["lower cashflow"].values,
-            line=dict(color='red'),
-            hovertemplate = '%{y:,.2f} €',
-            legendgroup="forecast",
-            fill='tonexty',
-            name="5% quantile"))
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_df["predicted_mean"].index,
+                    y=forecast_df["predicted_mean"].values,
+                    legendgroup="forecast",
+                    hovertemplate="%{y:,.2f} €",
+                    line=dict(color="red"),
+                    name="forecast mean",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_df["upper cashflow"].index,
+                    y=forecast_df["upper cashflow"].values,
+                    line=dict(color="red"),
+                    hovertemplate="%{y:,.2f} €",
+                    legendgroup="forecast",
+                    name="95% quantile",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_df["lower cashflow"].index,
+                    y=forecast_df["lower cashflow"].values,
+                    line=dict(color="red"),
+                    hovertemplate="%{y:,.2f} €",
+                    legendgroup="forecast",
+                    fill="tonexty",
+                    name="5% quantile",
+                )
+            )
 
-            fig.update_layout(hovermode="x", height=700,)
+            fig.update_layout(
+                hovermode="x",
+                height=700,
+            )
 
             fig.show()
 

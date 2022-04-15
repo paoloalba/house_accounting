@@ -211,7 +211,11 @@ class AccountingTable:
                     )
                     sel_sub_cat = np.random.choice(list(EnumSubCategory))
                     sel_time_cat = np.random.choice(
-                        [EnumTimeCategory.Exceptional, EnumTimeCategory.OneTime, EnumTimeCategory.Recurring],
+                        [
+                            EnumTimeCategory.Exceptional,
+                            EnumTimeCategory.OneTime,
+                            EnumTimeCategory.Recurring,
+                        ],
                         p=[0.01, 0.04, 0.95],
                     )
 
