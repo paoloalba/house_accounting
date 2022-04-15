@@ -1,12 +1,15 @@
+import numpy as np
 import pandas as pd
 import ipywidgets as widgets
 import plotly.express as px
 import plotly.graph_objects as go
+import statsmodels.api as sm
 
 from IPython.display import display
 from datetime import date, timedelta
 from sqlalchemy.sql import select, delete
 from sqlalchemy.orm import Session
+from pandas.tseries.offsets import MonthEnd, Week
 
 from house_accounting.models import Cashflow, MainCategory, SubCategory, Tag
 from house_accounting.enumerators import MainCategory as EnumMainCat
@@ -361,13 +364,9 @@ class AccountingDBManager(WidgetBase):
     def go_to_end_of(input_date, frq):
         current_date = input_date
         if frq == SampleFrequency.Weekly:
-            while current_date.isocalendar().week == input_date.isocalendar().week:
-                current_date = input_date
-                input_date += timedelta(days=1)
+            return input_date + Week(weekday=6)
         elif frq == SampleFrequency.Monthly:
-            while current_date.month == input_date.month:
-                current_date = input_date
-                input_date += timedelta(days=1)
+            return input_date + MonthEnd(0)
         elif frq == SampleFrequency.Yearly:
             while current_date.year == input_date.year:
                 current_date = input_date
@@ -578,6 +577,113 @@ class AccountingDBManager(WidgetBase):
             session.commit()
         self.show_db(None)
 
+    def get_fit_df(self, input_df, past_amnt):
+        fil_df = pd.get_dummies(
+            input_df, columns=["main_category", "sub_category", "time_category"]
+        )
+
+        sampl_frq = SampleFrequency.Weekly
+        if sampl_frq == SampleFrequency.Monthly:
+            d_frq = pd.offsets.MonthEnd(0)
+        elif sampl_frq == SampleFrequency.Weekly:
+            d_frq = pd.offsets.Week(weekday=6)
+        else:
+            raise Exception()
+
+        fil_df.date = fil_df.date.apply(
+            lambda x: AccountingDBManager.go_to_end_of(x, sampl_frq)
+        )
+
+        grp_df = fil_df.groupby("date")
+
+        all_df = []
+        all_df.append(grp_df.apply(lambda x: x.amount.sum()).rename("cashflow"))
+
+        cols = list(fil_df.columns)
+        cols.remove("id")
+        cols.remove("date")
+        cols.remove("amount")
+        cols.remove("description")
+        if "tag" in cols:
+            cols.remove("tag")
+
+        for ccc in cols:
+            all_df.append(grp_df.apply(lambda x: x[ccc].sum()).rename(ccc))
+
+        f_df = pd.concat(all_df, axis=1)
+
+        f_df.index = pd.to_datetime(f_df.index)
+        f_df["cashflow"] = f_df.cashflow.cumsum() + past_amnt
+
+        fit_df = f_df.reindex(
+            pd.date_range(start=f_df.index.min(), end=f_df.index.max(), freq=d_frq),
+            fill_value=0,
+        )
+
+        # Variables
+        endog = fit_df.loc[:, "cashflow"]
+
+        exodg_list = list(fit_df.columns)
+        exodg_list.remove("cashflow")
+        exog = sm.add_constant(fit_df.loc[:, exodg_list])
+
+        ido1 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
+        ido2 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
+        # Fit the model
+        mod = sm.tsa.statespace.SARIMAX(
+            endog,
+            exog=exog,
+            order=(ido1, 1, ido2),
+        )
+        fit_res = mod.fit(disp=False, maxiter=200, method="powell")
+
+        predict = fit_res.get_prediction()
+        predict_ci = predict.conf_int(alpha=0.05)
+        predict_ci["predicted_mean"] = predict.predicted_mean
+
+        poss_regr_frq = fit_df.drop("cashflow", axis=1)
+        poss_regr_frq = poss_regr_frq.value_counts(normalize=True)
+
+        num_bus_days = 52
+        num_sim = 1000
+
+        all_ser = []
+        for iii in range(num_sim):
+            ex1 = pd.DataFrame.from_records(
+                np.random.choice(
+                    poss_regr_frq.index.values, num_bus_days, p=poss_regr_frq.values
+                ),
+                columns=poss_regr_frq.index.names,
+            )
+            ex1 = sm.add_constant(ex1, has_constant="add")
+
+            fore = fit_res.get_forecast(steps=len(ex1.index), exog=ex1)
+            fore_ci = fore.conf_int(alpha=0.05)
+            fore_ci["predicted_mean"] = fore.predicted_mean
+
+            all_ser.append(fore_ci)
+
+        pred_list = []
+        pred_list.append("lower cashflow")
+        pred_list.append("predicted_mean")
+        pred_list.append("upper cashflow")
+        e_list = []
+        for nnn in pred_list:
+            tmp_1 = []
+            for ddd in all_ser:
+                tmp_1.append(ddd[nnn])
+            e1 = pd.concat(tmp_1, axis=1)
+            e_list.append(e1.mean(axis=1).rename(nnn))
+        fore_ci = pd.concat(e_list, axis=1)
+
+        # regr_df = pd.concat([fore_ci, predict_ci])
+        # regr_df.sort_index(inplace=True)
+
+        fore_ci = pd.concat([fore_ci, predict_ci.iloc[-1].to_frame().T])
+        fore_ci.sort_index(inplace=True)
+
+        return predict_ci, fore_ci
+
     def show_db(self, _):
         df = self.acc_table.get_df()
         df, past_df, min_date = self.filter_df(df)
@@ -658,6 +764,8 @@ class AccountingDBManager(WidgetBase):
                 min_date = tmp_init_df.date.min()
             df = df[~(df.sub_category == EnumSubCat.Initial.name)]
 
+            regr_df, forecast_df = self.get_fit_df(df, base_amnt)
+
             df.date = df.date.apply(
                 lambda x: AccountingDBManager.go_to_end_of(
                     x, self.sample_frq_dropdown.value
@@ -696,7 +804,56 @@ class AccountingDBManager(WidgetBase):
                     f'{tmp_s:<15} Income/Outcome/Net: {norm_net_income/vvv["value"]:,.2f}, {norm_net_outcome/vvv["value"]:,.2f}, {(norm_net_income+norm_net_outcome)/vvv["value"]:,.2f}'
                 )
 
-            fig = px.line(ser_cum_sum + base_amnt)
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(x=ser_cum_sum.index,
+            y=ser_cum_sum.values + base_amnt,
+            line=dict(color='blue'),
+            hovertemplate = '%{y:,.2f} €',
+            name="bank account"))
+
+            fig.add_trace(go.Scatter(x=regr_df["predicted_mean"].index,
+            y=regr_df["predicted_mean"].values,
+            legendgroup="regression",
+            hovertemplate = '%{y:,.2f} €',
+            line=dict(color='green'),
+            name="regr mean"))
+            fig.add_trace(go.Scatter(x=regr_df["upper cashflow"].index,
+            y=regr_df["upper cashflow"].values,
+            line=dict(color='green'),
+            hovertemplate = '%{y:,.2f} €',
+            legendgroup="regression",
+            name="95% quantile"))
+            fig.add_trace(go.Scatter(x=regr_df["lower cashflow"].index,
+            y=regr_df["lower cashflow"].values,
+            line=dict(color='green'),
+            hovertemplate = '%{y:,.2f} €',
+            legendgroup="regression",
+            fill='tonexty',
+            name="5% quantile"))
+
+            fig.add_trace(go.Scatter(x=forecast_df["predicted_mean"].index,
+            y=forecast_df["predicted_mean"].values,
+            legendgroup="forecast",
+            hovertemplate = '%{y:,.2f} €',
+            line=dict(color='red'),
+            name="forecast mean"))
+            fig.add_trace(go.Scatter(x=forecast_df["upper cashflow"].index,
+            y=forecast_df["upper cashflow"].values,
+            line=dict(color='red'),
+            hovertemplate = '%{y:,.2f} €',
+            legendgroup="forecast",
+            name="95% quantile"))
+            fig.add_trace(go.Scatter(x=forecast_df["lower cashflow"].index,
+            y=forecast_df["lower cashflow"].values,
+            line=dict(color='red'),
+            hovertemplate = '%{y:,.2f} €',
+            legendgroup="forecast",
+            fill='tonexty',
+            name="5% quantile"))
+
+            fig.update_layout(hovermode="x", height=700,)
+
             fig.show()
 
             ### Waterfall
