@@ -11,7 +11,7 @@ from sqlalchemy.sql import select, delete
 from sqlalchemy.orm import Session
 from pandas.tseries.offsets import MonthEnd, Week
 
-from house_accounting.models import Cashflow, MainCategory, SubCategory, Tag
+from house_accounting.models import Cashflow, MainCategory, SubCategory, TimeCategory, Tag
 from house_accounting.enumerators import MainCategory as EnumMainCat
 from house_accounting.enumerators import SubCategory as EnumSubCat
 from house_accounting.enumerators import TimeCategory as EnumTimeCat
@@ -84,6 +84,20 @@ class AccountingDBManager(WidgetBase):
             style=dict(description_width="initial"),
         )
         left_box_list.append(self.sub_category_combobox)
+
+        df = pd.read_sql(
+            select(TimeCategory),
+            self.db_engine,
+        )
+        self.time_category_combobox = widgets.Combobox(
+            placeholder="category",
+            options=df.category.sort_values().tolist(),
+            description="Time-Category:",
+            ensure_option=False,
+            disabled=False,
+            style=dict(description_width="initial"),
+        )
+        left_box_list.append(self.time_category_combobox)
 
         df = pd.read_sql(
             select(Tag),
@@ -342,6 +356,8 @@ class AccountingDBManager(WidgetBase):
             df = df[df.main_category == self.main_category_combobox.value]
         if self.sub_category_combobox.value:
             df = df[df.sub_category == self.sub_category_combobox.value]
+        if self.time_category_combobox.value:
+            df = df[df.time_category == self.time_category_combobox.value]
         if self.are_input_tags():
             df = df[
                 df.tag.apply(
@@ -515,6 +531,7 @@ class AccountingDBManager(WidgetBase):
 
         self.main_category_combobox.value = ""
         self.sub_category_combobox.value = ""
+        self.time_category_combobox.value = ""
         self.tags_field.value = ""
         self.tag_multiselect.value = []
         self.select_db_entries.value = []
@@ -550,6 +567,10 @@ class AccountingDBManager(WidgetBase):
                         ccc.sub_category = Cashflow.project_element(
                             session, self.sub_category_combobox.value, "sub_category"
                         )
+                    if self.time_category_combobox.value:
+                        ccc.time_category = Cashflow.project_element(
+                            session, self.time_category_combobox.value, "time_category"
+                        )
                     if self.are_input_tags():
                         tag_list = Cashflow.project_element(
                             session, self.get_input_tags_list(), "tags"
@@ -571,6 +592,7 @@ class AccountingDBManager(WidgetBase):
                 description=self.description_text.value,
                 main_category=self.main_category_combobox.value,
                 sub_category=self.sub_category_combobox.value,
+                time_category=self.time_category_combobox.value,
                 tags=self.get_input_tags_list(extend_tag_options=True),
             )
             session.add(cfl_entry)
