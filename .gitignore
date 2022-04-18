@@ -19,3 +19,5 @@ permanent_storage/*
 
 # generic
 notebooks/custom_libraries/generic_helpers/*
+
+.DS_Store
