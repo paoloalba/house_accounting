@@ -271,7 +271,7 @@ class AccountingDBManager(WidgetBase):
             )
         )
 
-        create_backupt_button = widgets.Button(
+        create_backup_button = widgets.Button(
             description="Create DB backup",
             disabled=False,
             button_style="",
@@ -279,7 +279,7 @@ class AccountingDBManager(WidgetBase):
             icon="check",
             layout=button_layout,
         )
-        left_box_list.append(create_backupt_button)
+        left_box_list.append(create_backup_button)
         # endregion
         # region Right Box
         self.output_window = widgets.Output(
@@ -312,7 +312,7 @@ class AccountingDBManager(WidgetBase):
         add_row_button.on_click(self.add_row)
         clear_fields_button.on_click(self.clear_fields)
         update_entries_button.on_click(self.update_entries)
-        create_backupt_button.on_click(self.create_backupt)
+        create_backup_button.on_click(self.create_backup)
 
     def display(self):
         super().display()
@@ -382,6 +382,7 @@ class AccountingDBManager(WidgetBase):
 
         return df, past_df, min_date
 
+    #region static helpers
     @staticmethod
     def go_to_end_of(input_date, frq):
         current_date = input_date
@@ -525,9 +526,10 @@ class AccountingDBManager(WidgetBase):
             net_income -= in_df.amount.sum()
 
         return net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days
+    #endregion
 
     # region Button actions
-    def create_backupt(self, _):
+    def create_backup(self, _):
         self.acc_table.create_backup()
 
     def clear_fields(self, _):
