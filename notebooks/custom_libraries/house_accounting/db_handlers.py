@@ -156,8 +156,9 @@ class AccountingTable:
     ):
         self.db_engine = self.get_db_engine(future=False)
 
+        num_years = 2
         end_date = date.today().replace(day=27)
-        start_date = end_date.replace(year=end_date.year - 2)
+        start_date = end_date.replace(year=end_date.year - num_years)
 
         with Session(self.db_engine) as session:
             cfl_entry = Cashflow(
@@ -172,12 +173,13 @@ class AccountingTable:
             )
             session.add(cfl_entry)
 
+            main_salary = 1800
             ref_date = start_date + pd.DateOffset(months=1)
-            while ref_date < end_date:
+            while ref_date <= end_date:
                 cfl_entry = Cashflow(
                     session=session,
                     date=ref_date,
-                    amount=1800,
+                    amount=main_salary,
                     description=f"salary for {ref_date:%b %y}",
                     main_category=EnumMainCategory.Income.name,
                     sub_category=EnumSubCategory.Salary.name,
@@ -188,7 +190,7 @@ class AccountingTable:
                 cfl_entry = Cashflow(
                     session=session,
                     date=ref_date,
-                    amount=1300,
+                    amount=main_salary * 0.85,
                     description=f"salary for {ref_date:%b %y}",
                     main_category=EnumMainCategory.Income.name,
                     sub_category=EnumSubCategory.Salary.name,
@@ -197,26 +199,82 @@ class AccountingTable:
                 )
                 session.add(cfl_entry)
 
-                month_start = (
-                    ref_date + pd.offsets.MonthEnd(0) - pd.offsets.MonthBegin(1)
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=ref_date,
+                    amount=main_salary * 0.45,
+                    description=f"rent for {ref_date:%b %y}",
+                    main_category=EnumMainCategory.Outcome.name,
+                    sub_category=EnumSubCategory.House.name,
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["rent"],
+                )
+                session.add(cfl_entry)
+
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=ref_date,
+                    amount=main_salary * 0.03,
+                    description=f"bill 1 for {ref_date:%b %y}",
+                    main_category=EnumMainCategory.Outcome.name,
+                    sub_category=EnumSubCategory.House.name,
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["bill_1"],
+                )
+                session.add(cfl_entry)
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=ref_date,
+                    amount=main_salary * 0.04,
+                    description=f"bill 2 for {ref_date:%b %y}",
+                    main_category=EnumMainCategory.Outcome.name,
+                    sub_category=EnumSubCategory.House.name,
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["bill_2"],
+                )
+                session.add(cfl_entry)
+
+                ref_date += pd.DateOffset(months=1)
+
+            ref_date = start_date + pd.offsets.Week(weekday=5)
+            while ref_date <= end_date:
+                cfl_entry = Cashflow(
+                    session=session,
+                    date=ref_date,
+                    amount=main_salary * 0.051,
+                    description=f"food for {ref_date:%W %b %y}",
+                    main_category=EnumMainCategory.Outcome.name,
+                    sub_category=EnumSubCategory.Food.name,
+                    time_category=EnumTimeCategory.Recurring.name,
+                    tags=["food"],
+                )
+                session.add(cfl_entry)
+
+                period_start = (
+                    ref_date + pd.offsets.Week(weekday=0) - pd.offsets.Week(1, weekday=0)
                 ).floor("d")
-                month_end = (ref_date + pd.offsets.MonthEnd(0)).floor("d")
+                period_end = (ref_date + pd.offsets.Week(weekday=6)).floor("d")
+                
                 all_dates = pd.date_range(
-                    start=month_start, end=month_end
+                    start=period_start, end=period_end
                 ).to_pydatetime()
-                for iii in range(np.random.randint(2, 25)):
+                rec_prob = 0.97
+                excp_prob = 0.005
+                onetime_prob = 1 - rec_prob - excp_prob
+                for iii in range(np.random.randint(2, 10)):
                     sel_cashflow_dir = np.random.choice(
                         [EnumMainCategory.Income, EnumMainCategory.Outcome],
-                        p=[0.05, 0.95],
+                        p=[0.025, 0.975],
                     )
                     sel_sub_cat = np.random.choice(list(EnumSubCategory))
+
                     sel_time_cat = np.random.choice(
                         [
                             EnumTimeCategory.Exceptional,
                             EnumTimeCategory.OneTime,
                             EnumTimeCategory.Recurring,
                         ],
-                        p=[0.01, 0.04, 0.95],
+                        p=[excp_prob, onetime_prob, rec_prob],
                     )
 
                     sel_date = np.random.choice(all_dates)
@@ -242,7 +300,7 @@ class AccountingTable:
                     )
                     session.add(cfl_entry)
 
-                ref_date += pd.DateOffset(months=1)
+                ref_date += pd.DateOffset(weeks=1)
 
             session.commit()
 

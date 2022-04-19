@@ -612,9 +612,15 @@ class AccountingDBManager(WidgetBase):
 
         sampl_frq = SampleFrequency.Weekly
         if sampl_frq == SampleFrequency.Monthly:
-            d_frq = pd.offsets.MonthEnd(0)
+            d_frq = pd.offsets.MonthEnd()
+            num_bus_days = 12
+            ido1 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(53)]
+            ido2 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(53)]
         elif sampl_frq == SampleFrequency.Weekly:
             d_frq = pd.offsets.Week(weekday=6)
+            num_bus_days = 52
+            ido1 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
+            ido2 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
         else:
             raise Exception()
 
@@ -655,8 +661,6 @@ class AccountingDBManager(WidgetBase):
         exodg_list.remove("cashflow")
         exog = sm.add_constant(fit_df.loc[:, exodg_list])
 
-        ido1 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
-        ido2 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
         # Fit the model
         mod = sm.tsa.statespace.SARIMAX(
             endog,
@@ -672,7 +676,6 @@ class AccountingDBManager(WidgetBase):
         poss_regr_frq = fit_df.drop("cashflow", axis=1)
         poss_regr_frq = poss_regr_frq.value_counts(normalize=True)
 
-        num_bus_days = 52
         num_sim = 1000
 
         all_ser = []
