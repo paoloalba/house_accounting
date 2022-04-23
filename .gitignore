@@ -21,3 +21,6 @@ permanent_storage/*
 notebooks/custom_libraries/generic_helpers/*
 
 .DS_Store
+
+*/.cookiecutter_replay/*
+.bash_history

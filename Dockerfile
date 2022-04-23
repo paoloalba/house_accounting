@@ -2,8 +2,20 @@ FROM jupyter/scipy-notebook:python-3.9.10 as base
 
 RUN pip install nb_black
 RUN pip install plotly
+
+# RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
+# RUN pip install ipyaggrid
+# RUN jupyter labextension install ipyaggrid
+
 RUN pip install ipywidgets==8.0.0rc0
-RUN pip install pandarallel
+
+# RUN pip install pandarallel
+
+# RUN corepack enable
+# RUN pip install jupyter-packaging
+# RUN pip install cookiecutter
+# RUN npm install --global yarn
+
 
 FROM base as debug
 RUN pip install ptvsd
