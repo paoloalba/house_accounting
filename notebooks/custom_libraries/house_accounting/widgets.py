@@ -1,3 +1,5 @@
+import functools
+
 import numpy as np
 import pandas as pd
 import ipywidgets as widgets
@@ -22,7 +24,6 @@ from house_accounting.enumerators import MainCategory as EnumMainCat
 from house_accounting.enumerators import SubCategory as EnumSubCat
 from house_accounting.enumerators import TimeCategory as EnumTimeCat
 from house_accounting.enumerators import SampleFrequency
-
 
 class WidgetBase:
     def __init__(self, base_dir) -> None:
@@ -308,7 +309,7 @@ class AccountingDBManager(WidgetBase):
             [widgets.HBox([left_box, right_box]), self.draw_output_window]
         )
 
-        show_db_button.on_click(self.show_db)
+        show_db_button.on_click(functools.partial(self.show_db, update_graphs=True))
         add_row_button.on_click(self.add_row)
         clear_fields_button.on_click(self.clear_fields)
         update_entries_button.on_click(self.update_entries)
@@ -316,7 +317,7 @@ class AccountingDBManager(WidgetBase):
 
     def display(self):
         super().display()
-        self.show_db(None)
+        self.show_db(None, update_graphs = True)
 
     def get_filtered_df(self):
         df = self.acc_table.get_df()
@@ -589,7 +590,7 @@ class AccountingDBManager(WidgetBase):
                             tag_list.extend(ccc.tags)
                             ccc.tags = list(set(tag_list))
             session.commit()
-        self.show_db(None)
+        self.show_db(None, update_graphs=False)
 
     def add_row(self, _):
         with Session(self.db_engine) as session:
@@ -605,7 +606,7 @@ class AccountingDBManager(WidgetBase):
             )
             session.add(cfl_entry)
             session.commit()
-        self.show_db(None)
+        self.show_db(None, update_graphs=False)
 
     def get_fit_df(self, input_df, past_amnt):
         fil_df = pd.get_dummies(
@@ -717,7 +718,7 @@ class AccountingDBManager(WidgetBase):
 
         return predict_ci, fore_ci
 
-    def show_db(self, _):
+    def show_db(self, _, update_graphs=True):
         df = self.acc_table.get_df()
         df, past_df, min_date = self.filter_df(df)
         base_amnt = past_df.amount.sum()
@@ -797,7 +798,8 @@ class AccountingDBManager(WidgetBase):
                 min_date = tmp_init_df.date.min()
             df = df[~(df.sub_category == EnumSubCat.Initial.name)]
 
-            regr_df, forecast_df = self.get_fit_df(df, base_amnt)
+            if update_graphs:
+                regr_df, forecast_df = self.get_fit_df(df, base_amnt)
 
             df.date = df.date.apply(
                 lambda x: AccountingDBManager.go_to_end_of(
@@ -849,69 +851,70 @@ class AccountingDBManager(WidgetBase):
                 )
             )
 
-            fig.add_trace(
-                go.Scatter(
-                    x=regr_df["predicted_mean"].index,
-                    y=regr_df["predicted_mean"].values,
-                    legendgroup="regression",
-                    hovertemplate="%{y:,.2f} €",
-                    line=dict(color="green"),
-                    name="regr mean",
+            if update_graphs:
+                fig.add_trace(
+                    go.Scatter(
+                        x=regr_df["predicted_mean"].index,
+                        y=regr_df["predicted_mean"].values,
+                        legendgroup="regression",
+                        hovertemplate="%{y:,.2f} €",
+                        line=dict(color="green"),
+                        name="regr mean",
+                    )
                 )
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=regr_df["upper cashflow"].index,
-                    y=regr_df["upper cashflow"].values,
-                    line=dict(color="green"),
-                    hovertemplate="%{y:,.2f} €",
-                    legendgroup="regression",
-                    name="95% quantile",
+                fig.add_trace(
+                    go.Scatter(
+                        x=regr_df["upper cashflow"].index,
+                        y=regr_df["upper cashflow"].values,
+                        line=dict(color="green"),
+                        hovertemplate="%{y:,.2f} €",
+                        legendgroup="regression",
+                        name="95% quantile",
+                    )
                 )
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=regr_df["lower cashflow"].index,
-                    y=regr_df["lower cashflow"].values,
-                    line=dict(color="green"),
-                    hovertemplate="%{y:,.2f} €",
-                    legendgroup="regression",
-                    fill="tonexty",
-                    name="5% quantile",
+                fig.add_trace(
+                    go.Scatter(
+                        x=regr_df["lower cashflow"].index,
+                        y=regr_df["lower cashflow"].values,
+                        line=dict(color="green"),
+                        hovertemplate="%{y:,.2f} €",
+                        legendgroup="regression",
+                        fill="tonexty",
+                        name="5% quantile",
+                    )
                 )
-            )
 
-            fig.add_trace(
-                go.Scatter(
-                    x=forecast_df["predicted_mean"].index,
-                    y=forecast_df["predicted_mean"].values,
-                    legendgroup="forecast",
-                    hovertemplate="%{y:,.2f} €",
-                    line=dict(color="red"),
-                    name="forecast mean",
+                fig.add_trace(
+                    go.Scatter(
+                        x=forecast_df["predicted_mean"].index,
+                        y=forecast_df["predicted_mean"].values,
+                        legendgroup="forecast",
+                        hovertemplate="%{y:,.2f} €",
+                        line=dict(color="red"),
+                        name="forecast mean",
+                    )
                 )
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=forecast_df["upper cashflow"].index,
-                    y=forecast_df["upper cashflow"].values,
-                    line=dict(color="red"),
-                    hovertemplate="%{y:,.2f} €",
-                    legendgroup="forecast",
-                    name="95% quantile",
+                fig.add_trace(
+                    go.Scatter(
+                        x=forecast_df["upper cashflow"].index,
+                        y=forecast_df["upper cashflow"].values,
+                        line=dict(color="red"),
+                        hovertemplate="%{y:,.2f} €",
+                        legendgroup="forecast",
+                        name="95% quantile",
+                    )
                 )
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=forecast_df["lower cashflow"].index,
-                    y=forecast_df["lower cashflow"].values,
-                    line=dict(color="red"),
-                    hovertemplate="%{y:,.2f} €",
-                    legendgroup="forecast",
-                    fill="tonexty",
-                    name="5% quantile",
+                fig.add_trace(
+                    go.Scatter(
+                        x=forecast_df["lower cashflow"].index,
+                        y=forecast_df["lower cashflow"].values,
+                        line=dict(color="red"),
+                        hovertemplate="%{y:,.2f} €",
+                        legendgroup="forecast",
+                        fill="tonexty",
+                        name="5% quantile",
+                    )
                 )
-            )
 
             fig.update_layout(
                 hovermode="x",
