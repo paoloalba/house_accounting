@@ -3,9 +3,8 @@ FROM jupyter/scipy-notebook:python-3.9.10 as base
 RUN pip install nb_black
 RUN pip install plotly
 
-# RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
 # RUN pip install ipyaggrid
-# RUN jupyter labextension install ipyaggrid
+# RUN jupyter labextension install ipyaggrid @jupyter-widgets/jupyterlab-manager
 
 RUN pip install ipywidgets==8.0.0rc0
 
