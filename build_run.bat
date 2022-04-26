@@ -12,8 +12,8 @@
 
 @set PERMANENT_STORAGE=.\permanent_storage
 
-call docker-compose build
-call docker-compose up
-call docker-compose down
+call docker-compose --project-name %dockerfile_target% build
+call docker-compose --project-name %dockerfile_target% up
+call docker-compose --project-name %dockerfile_target% down
 
 @if "%2"==""exit"" exit

@@ -1,9 +1,9 @@
 @set chrome_path="C:\Program Files\Google\Chrome\Application\chrome.exe"
 @set local_token="plutarco"
-@set JUPYTER_CONTAINER_HOST_PORT=8888
-@set JUPYTER_CONTAINER_DEBUG_HOST_PORT=8889
+@set JUPYTER_CONTAINER_HOST_PORT=8788
+@set JUPYTER_CONTAINER_DEBUG_HOST_PORT=8789
 
-start build_run.bat prod "exit"
+start build_run.bat ipyaggrid "exit"
 
 timeout 12
 

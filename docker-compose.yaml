@@ -3,7 +3,7 @@ services:
     scipy-notebook:
         ports:
             - "${JUPYTER_CONTAINER_HOST_PORT}:8888"
-            - '8889:8889'
+            - "${JUPYTER_CONTAINER_DEBUG_HOST_PORT}:8889"
         volumes:
             - "${NOTEBOOK_DIR}:/home/jovyan"
             - "${PERMANENT_STORAGE}:/home/jovyan/permanent_storage/"
@@ -16,4 +16,4 @@ services:
             context: .
             dockerfile: ${dockerfile_src}
             target: ${dockerfile_target}
-        image: ${registry}/${repositoryName}:${versionNumber}
+        image: "${registry}/${repositoryName}:${dockerfile_target}_${versionNumber}"
