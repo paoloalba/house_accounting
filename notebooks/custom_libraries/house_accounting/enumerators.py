@@ -7,6 +7,7 @@ class MainCategory(Enum):
 
 
 class SubCategory(Enum):
+    NA = -1
     Initial = 0
     House = 1
     Salary = 2
@@ -18,6 +19,7 @@ class SubCategory(Enum):
 
 
 class TimeCategory(Enum):
+    NA = -1
     Recurring = 1
     OneTime = 2
     Exceptional = 3

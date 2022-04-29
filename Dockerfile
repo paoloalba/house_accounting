@@ -24,5 +24,7 @@ CMD ["jupyter", "lab", "--ip", "0.0.0.0"]
 FROM base as ipyaggrid
 RUN pip install ipyaggrid
 RUN jupyter labextension install ipyaggrid @jupyter-widgets/jupyterlab-manager
+RUN pip install ipysheet
+# RUN jupyter labextension install ipysheet
 
 CMD ["jupyter", "lab", "--ip", "0.0.0.0"]

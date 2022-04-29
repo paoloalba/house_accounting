@@ -25,6 +25,7 @@ from house_accounting.enumerators import SubCategory as EnumSubCat
 from house_accounting.enumerators import TimeCategory as EnumTimeCat
 from house_accounting.enumerators import SampleFrequency
 
+
 class WidgetBase:
     def __init__(self, base_dir) -> None:
         self.main_element = None
@@ -317,7 +318,7 @@ class AccountingDBManager(WidgetBase):
 
     def display(self):
         super().display()
-        self.show_db(None, update_graphs = True)
+        self.show_db(None, update_graphs=True)
 
     def get_filtered_df(self):
         df = self.acc_table.get_df()
@@ -383,7 +384,7 @@ class AccountingDBManager(WidgetBase):
 
         return df, past_df, min_date
 
-    #region static helpers
+    # region static helpers
     @staticmethod
     def go_to_end_of(input_date, frq):
         current_date = input_date
@@ -527,7 +528,8 @@ class AccountingDBManager(WidgetBase):
             net_income -= in_df.amount.sum()
 
         return net_income, net_outcome, frac_years, tot_months, tot_weeks, tot_days
-    #endregion
+
+    # endregion
 
     # region Button actions
     def create_backup(self, _):

@@ -251,10 +251,12 @@ class AccountingTable:
                 session.add(cfl_entry)
 
                 period_start = (
-                    ref_date + pd.offsets.Week(weekday=0) - pd.offsets.Week(1, weekday=0)
+                    ref_date
+                    + pd.offsets.Week(weekday=0)
+                    - pd.offsets.Week(1, weekday=0)
                 ).floor("d")
                 period_end = (ref_date + pd.offsets.Week(weekday=6)).floor("d")
-                
+
                 all_dates = pd.date_range(
                     start=period_start, end=period_end
                 ).to_pydatetime()
