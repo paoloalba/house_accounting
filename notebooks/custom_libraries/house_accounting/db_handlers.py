@@ -263,12 +263,15 @@ class AccountingTable:
                 rec_prob = 0.97
                 excp_prob = 0.005
                 onetime_prob = 1 - rec_prob - excp_prob
+                sub_cat_choices = list(EnumSubCategory)
+                sub_cat_choices.remove(EnumSubCategory.NA)
+                sub_cat_choices.remove(EnumSubCategory.Initial)
                 for iii in range(np.random.randint(2, 10)):
                     sel_cashflow_dir = np.random.choice(
                         [EnumMainCategory.Income, EnumMainCategory.Outcome],
                         p=[0.025, 0.975],
                     )
-                    sel_sub_cat = np.random.choice(list(EnumSubCategory))
+                    sel_sub_cat = np.random.choice(sub_cat_choices)
 
                     sel_time_cat = np.random.choice(
                         [
