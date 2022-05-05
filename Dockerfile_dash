@@ -1,0 +1,16 @@
+FROM python:3.10 as base
+
+RUN pip install dash
+RUN pip install pandas
+RUN pip install numpy
+RUN pip install sqlalchemy
+RUN pip install pyyaml
+RUN pip install statsmodels
+RUN pip install ipywidgets
+
+FROM base as dashboard
+
+# COPY ./check.sh .
+# RUN chmod a+x check.sh
+# CMD ["./check.sh"]
+CMD ["python", "/home/jovyan/custom_libraries/house_accounting/dashboard.py"]

@@ -4,9 +4,10 @@ cd "${cur_dir_name}"
 
 export local_token="plutarco"
 export JUPYTER_CONTAINER_HOST_PORT=8888
+export JUPYTER_CONTAINER_DEBUG_HOST_PORT=8889
 export aux_script_name="aux_cmd.command"
 
-echo -e "export JUPYTER_CONTAINER_HOST_PORT=${JUPYTER_CONTAINER_HOST_PORT}\ncd ${cur_dir_name}\nsh build_run.sh prod" > ${aux_script_name}; chmod +x ${aux_script_name}; open ${aux_script_name}
+echo -e "export JUPYTER_CONTAINER_HOST_PORT=${JUPYTER_CONTAINER_HOST_PORT}\nexport JUPYTER_CONTAINER_DEBUG_HOST_PORT=${JUPYTER_CONTAINER_DEBUG_HOST_PORT}\ncd ${cur_dir_name}\nsh build_run.sh prod" > ${aux_script_name}; chmod +x ${aux_script_name}; open ${aux_script_name}
 
 sleep 4
 
