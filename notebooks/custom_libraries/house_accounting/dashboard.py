@@ -10,6 +10,7 @@ import statsmodels.api as sm
 from dash import Dash, dash_table, dcc, html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from plotly.subplots import make_subplots
 
 sys.path.append(os.getenv("GLOBAL_LIBRARIES_PATH", ""))
 sys.path = list(set(sys.path))
@@ -75,12 +76,17 @@ base_amnt_store = dcc.Store(id="base_amnt_store")
 add_row_button = html.Button("Add Row", n_clicks=0, id="add_row_button")
 update_regression_button = html.Button("Update Regression", n_clicks=0, id="update_regression_button")
 
+### Text
+summary_text = dcc.Markdown(style={"white-space": "pre"})
+
 app.layout = html.Div(
     [
         html.Div([
         html.Div([add_row_button, update_regression_button]),
         html.Br(),
         main_table,
+        html.Hr(),
+        summary_text,
         html.Hr(),
         plot_container,
         main_series_store,
@@ -215,7 +221,7 @@ def get_fit_df(input_df, past_amnt):
 )
 def add_row(n_clicks, rows, columns):
     if n_clicks > 0:
-        rows.append({c["id"]: "" for c in columns})
+        rows.insert(0, {c["id"]: "" for c in columns})
     return rows
 
 @app.callback(
@@ -241,12 +247,39 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
     Output(main_series_store, "data"),
     Output(main_df_store, "data"),
     Output(base_amnt_store, "data"),
+    Output(summary_text, "children"),
     Input(main_table, "derived_virtual_data"),)
 def update_main_series(rows):
 
     dff = df.copy() if rows is None else pd.DataFrame(rows)
+    dff = dff[dff["id"] != ""]
     if len(dff.index) == 0:
         raise PreventUpdate
+
+    dff["date"] = pd.to_datetime(dff["date"])
+
+    (
+        net_income,
+        net_outcome,
+        frac_years,
+        tot_months,
+        tot_weeks,
+        tot_days,
+    ) = AccountingDBManager.get_income_analysis(dff)
+
+    norm_df = dff[
+        (dff.time_category != TimeCategory.Exceptional.name)
+        & (dff.time_category != TimeCategory.OneTime.name)
+    ]
+    (
+        norm_net_income,
+        norm_net_outcome,
+        _,
+        _,
+        _,
+        _,
+    ) = AccountingDBManager.get_income_analysis(norm_df)
+
 
     base_amnt = 0
     tmp_init_df = dff[dff.sub_category == SubCategory.Initial.name]
@@ -263,8 +296,35 @@ def update_main_series(rows):
     ser.sort_index(inplace=True)
     ser_cum_sum = ser.cumsum()
 
+    md_arro = []
+    md_arro.append(f"Base on {min_date:%d-%m-%Y}: {base_amnt:,.2f}")
+    md_arro.append(f"Saldo on {ser_cum_sum.index[-1]:%d-%m-%Y}: {ser_cum_sum[-1]:,.2f} ({ser_cum_sum[-1]+base_amnt:,.2f})")
+
+    dict_1 = {}
+    dict_1["Yearly"] = {"value": frac_years, "fmt": ".2f"}
+    dict_1["Monthly"] = {"value": tot_months, "fmt": "d"}
+    dict_1["Weekly"] = {"value": tot_weeks, "fmt": ".2f"}
+    dict_1["Daily"] = {"value": tot_days, "fmt": "d"}
+    for kkk, vvv in dict_1.items():
+        tmp_s = f'{kkk:<7}({vvv["value"]:{vvv["fmt"]}})'
+        md_arro.append(
+            f'{tmp_s:<25} Income/Outcome/Net: {net_income/vvv["value"]:,.2f}, {net_outcome/vvv["value"]:,.2f}, {(net_income+net_outcome)/vvv["value"]:,.2f}'
+        )
+
+    md_arro.append("--- Just with normal cashflows ---")
+    md_arro.append(
+        f"Saldo on {norm_df.date.max():%d-%m-%Y}: {norm_df.amount.sum():,.2f} ({norm_df.amount.sum()+base_amnt:,.2f})"
+    )
+    for kkk, vvv in dict_1.items():
+        tmp_s = f'{kkk:<7}({vvv["value"]:{vvv["fmt"]}})'
+        md_arro.append(
+            f'{tmp_s:<25} Income/Outcome/Net: {norm_net_income/vvv["value"]:,.2f}, {norm_net_outcome/vvv["value"]:,.2f}, {(norm_net_income+norm_net_outcome)/vvv["value"]:,.2f}'
+        )
+
+    md_text = "\n".join(md_arro)
+
     if len(ser_cum_sum.index) > 0:
-        return (ser_cum_sum + base_amnt).to_json(), dff.to_json(), json.dumps({"base_amnt": base_amnt})
+        return (ser_cum_sum + base_amnt).to_json(), dff.to_json(), json.dumps({"base_amnt": base_amnt}), md_text
     else:
         raise PreventUpdate
 
@@ -276,7 +336,9 @@ def update_main_series(rows):
     )
 def update_graphs(json_main_series, json_regression_series, json_forecast_series):
 
-    fig = go.Figure()
+    fig = make_subplots(rows=2, cols=1,
+                    shared_xaxes=True,
+                    vertical_spacing=0.02)
 
     if json_main_series:
         ser = pd.read_json(json_main_series, typ="series")
@@ -287,7 +349,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 line=dict(color="blue"),
                 hovertemplate="%{y:,.2f} €",
                 name="bank account",
-            )
+            ),
+            row=1,
+            col=1,
         )
     if json_regression_series:
         regr_df = pd.read_json(json_regression_series, typ="frame")
@@ -299,7 +363,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 hovertemplate="%{y:,.2f} €",
                 line=dict(color="green"),
                 name="regr mean",
-            )
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
             go.Scatter(
@@ -309,7 +375,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 hovertemplate="%{y:,.2f} €",
                 legendgroup="regression",
                 name="95% quantile",
-            )
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
             go.Scatter(
@@ -320,7 +388,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 legendgroup="regression",
                 fill="tonexty",
                 name="5% quantile",
-            )
+            ),
+            row=1,
+            col=1,
         )
 
 
@@ -334,7 +404,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 hovertemplate="%{y:,.2f} €",
                 line=dict(color="red"),
                 name="forecast mean",
-            )
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
             go.Scatter(
@@ -344,7 +416,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 hovertemplate="%{y:,.2f} €",
                 legendgroup="forecast",
                 name="95% quantile",
-            )
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
             go.Scatter(
@@ -355,7 +429,9 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 legendgroup="forecast",
                 fill="tonexty",
                 name="5% quantile",
-            )
+            ),
+            row=1,
+            col=1,
         )
 
 
