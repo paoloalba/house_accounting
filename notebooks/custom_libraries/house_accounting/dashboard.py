@@ -11,6 +11,7 @@ from dash import Dash, dash_table, dcc, html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from plotly.subplots import make_subplots
+import plotly.express as px
 
 sys.path.append(os.getenv("GLOBAL_LIBRARIES_PATH", ""))
 sys.path = list(set(sys.path))
@@ -323,8 +324,8 @@ def update_main_series(rows):
 
     md_text = "\n".join(md_arro)
 
-    if len(ser_cum_sum.index) > 0:
-        return (ser_cum_sum + base_amnt).to_json(), dff.to_json(), json.dumps({"base_amnt": base_amnt}), md_text
+    if len(ser.index) > 0:
+        return ser.to_json(), dff.to_json(), json.dumps({"base_amnt": base_amnt}), md_text
     else:
         raise PreventUpdate
 
@@ -333,26 +334,86 @@ def update_main_series(rows):
     Input(main_series_store, "data"),
     Input(regression_series_store, "data"),
     Input(forecast_series_store, "data"),
+    State(base_amnt_store, "data"),
+    State(main_df_store, "data"),
     )
-def update_graphs(json_main_series, json_regression_series, json_forecast_series):
+def update_graphs(json_main_series, json_regression_series, json_forecast_series, json_base_amnt, json_main_df):
 
-    fig = make_subplots(rows=2, cols=1,
-                    shared_xaxes=True,
-                    vertical_spacing=0.02)
+    fig = make_subplots(rows=2, cols=2,
+                    shared_xaxes=False,
+                    vertical_spacing=0.05,
+                    specs=[[{}, {"rowspan": 2, "type": "domain"}],
+                           [{}, None]],
+                    column_widths=[0.7, 0.3],
+                    )
 
     if json_main_series:
         ser = pd.read_json(json_main_series, typ="series")
+        base_amnt = json.loads(json_base_amnt)["base_amnt"]
+        ser_cum_sum = ser.cumsum() + base_amnt
+        dff = pd.read_json(json_main_df, typ="frame")
+
         fig.add_trace(
             go.Scatter(
-                x=ser.index,
-                y=ser.values,
+                x=ser_cum_sum.index,
+                y=ser_cum_sum.values,
                 line=dict(color="blue"),
                 hovertemplate="%{y:,.2f} €",
-                name="bank account",
+                name="Bank account",
             ),
             row=1,
             col=1,
         )
+
+        ### Waterfall
+        years = []
+        quarters = []
+        months = []
+        weeks = []
+        days = []
+        measures = []
+        values = []
+        for ido, vvv in ser.iteritems():
+            if vvv != 0:
+                years.append(ido.year)
+                quarters.append(f"q{(ido.month-1)//3 + 1} - {ido.year}")
+                months.append(f'{ido.strftime("%b")} - {ido.year}')
+                weeks.append(f"{ido.isocalendar().week} - {ido.year}")
+                days.append(f"{ido.timetuple().tm_yday} - {ido.year}")
+
+                measures.append("relative")
+                values.append(vvv)
+
+        sel_tune = days
+
+        fig.add_trace(
+            go.Waterfall(
+                x=[years, sel_tune],
+                measure=measures,
+                y=values,
+                base=base_amnt,
+                name="Cashflow"
+            ),
+            row=2,
+            col=1,
+        )
+
+        ### SunBurst
+        dff["amount"] = np.abs(dff["amount"])
+
+        fig.add_trace(
+            list(px.sunburst(
+                dff,
+                path=["main_category", "sub_category", "time_category", "tag"],
+                values="amount",
+                color='main_category',
+                color_discrete_map={'(?)':'black', 'Income':'green', 'Outcome':'red'}
+            ).select_traces())[0],
+            row=1,
+            col=2,
+        )
+
+
     if json_regression_series:
         regr_df = pd.read_json(json_regression_series, typ="frame")
         fig.add_trace(
@@ -392,8 +453,6 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
             row=1,
             col=1,
         )
-
-
     if json_forecast_series:
         forecast_df = pd.read_json(json_forecast_series, typ="frame")
         fig.add_trace(
@@ -434,15 +493,14 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
             col=1,
         )
 
-
     fig.update_layout(
         hovermode="x",
         height=700,
+        waterfallgap=0.3,
     )
 
     return [dcc.Graph(figure=fig,)]
 
 
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0", debug=True)
-    # app.run_server(host="0.0.0.0")
+    app.run_server(host="0.0.0.0")

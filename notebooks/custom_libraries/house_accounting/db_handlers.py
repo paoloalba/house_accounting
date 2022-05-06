@@ -293,6 +293,9 @@ class AccountingTable:
                     else:
                         raise Exception(f"Unrecognised time category: {sel_time_cat}")
 
+                    if sel_sub_cat == EnumSubCategory.Salary:
+                        sel_cashflow_dir = EnumMainCategory.Income
+
                     cfl_entry = Cashflow(
                         session=session,
                         date=sel_date,
