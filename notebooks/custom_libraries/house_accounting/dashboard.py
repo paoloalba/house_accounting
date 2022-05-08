@@ -30,7 +30,7 @@ original_pmt_storage = os.getenv("PMT_STG_PATH")
 pmt_storage = os.path.join(original_pmt_storage, "house_accounting")
 os.makedirs(pmt_storage, exist_ok=True)
 
-db_path = os.path.join(pmt_storage, global_config["example_db_name"])
+db_path = os.path.join(pmt_storage, global_config["automatic_parsed_db_name"])
 acc_table = AccountingTable(db_path)
 
 df = acc_table.get_df()
@@ -48,6 +48,8 @@ for i in df.columns:
         tmp_dict["type"] = "datetime"
     elif i in ["main_category","sub_category","time_category"]:
         tmp_dict["presentation"] = "dropdown"
+        if i == "main_category":
+            tmp_dict["editable"] = False
     elif i == "id":
         tmp_dict["editable"] = False
     datatable_cols.append(tmp_dict)
@@ -292,6 +294,10 @@ def update_output(n_clicks_show, n_clicks_update, data, data_diff):
                             setattr(ccc, index, new_elem)
                     updated_entries += 1
                 else:
+                    if row.amount > 0:
+                        main_cat = MainCategory.Income
+                    else:
+                        main_cat = MainCategory.Outcome
                     cfl_entry = Cashflow(
                         session=session,
                         date=row.date,
@@ -307,7 +313,6 @@ def update_output(n_clicks_show, n_clicks_update, data, data_diff):
             session.commit()
 
         return f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}", None
-
     else:
         if n_clicks_show is None:
             raise PreventUpdate

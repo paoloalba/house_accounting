@@ -109,13 +109,13 @@ class AccountingTable:
             inplace=True,
         )
 
-        if add_amount_sign:
-            df["amount"] = df.apply(
-                lambda x: x.amount
-                if x.main_category == EnumMainCategory.Income.name
-                else -x.amount,
-                axis=1,
-            )
+        # if add_amount_sign:
+        #     df["amount"] = df.apply(
+        #         lambda x: x.amount
+        #         if x.main_category == EnumMainCategory.Income.name
+        #         else -x.amount,
+        #         axis=1,
+        #     )
 
         return df
 

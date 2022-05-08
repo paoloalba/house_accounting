@@ -1,5 +1,5 @@
 from enum import Enum
-from sqlalchemy import MetaData, Table, Column, Integer, String, Float, Date, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy import select
 
 from sqlalchemy.orm import declarative_base
@@ -90,7 +90,7 @@ class Cashflow(Base):
 
     id = Column(Integer, primary_key=True)
 
-    date = Column(Date, nullable=False)
+    date = Column(DateTime, nullable=False)
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=False)
 
