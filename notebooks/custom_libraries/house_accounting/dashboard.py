@@ -44,6 +44,7 @@ for i in df.columns:
     if i == "amount":
         tmp_dict["type"] = "numeric"
         tmp_dict["format"] = dict(specifier=',.2f')
+        tmp_dict["filter_options"] = dict(case="sensitive")
     elif i == "date":
         tmp_dict["type"] = "datetime"
     elif i in ["main_category","sub_category","time_category"]:
@@ -320,7 +321,12 @@ def update_output(n_clicks_show, n_clicks_update, data, data_diff):
         diff_store_data = diff_dashtable(data)
 
         if len(diff_store_data.index) > 0:
-            return [dcc.Markdown(f'{type(row)}: {row}') for ido, row in diff_store_data.iterrows()], diff_store_data.to_json()
+            md_list = []
+            for ido, row in diff_store_data.iterrows():
+                tmp_s = "; ".join([ f'{iii} -> {vvv}' for iii, vvv in row.items()])
+                tmp_s = f'{ido}: {tmp_s}'
+                md_list.append(dcc.Markdown(tmp_s))
+            return md_list, diff_store_data.to_json()
         else:
             return "No Changes to DataTable", None
 
@@ -619,4 +625,4 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
 
 
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0")
+    app.run_server(host="0.0.0.0", debug=False)
