@@ -53,6 +53,8 @@ for i in df.columns:
             tmp_dict["editable"] = False
     elif i == "id":
         tmp_dict["editable"] = False
+        tmp_dict["type"] = "numeric"
+        tmp_dict["filter_options"] = dict(case="sensitive")
     datatable_cols.append(tmp_dict)
 
 dropdown = {}
