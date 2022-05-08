@@ -1,4 +1,4 @@
 these two commands have to be ran on the same level as the alembic.ini file
 
-alembic revision --autogenerate -m "second"
+alembic revision --autogenerate -m "some comment if you like"
 alembic upgrade head
