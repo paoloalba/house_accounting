@@ -1,5 +1,14 @@
 from enum import Enum
-from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import (
+    MetaData,
+    Table,
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    ForeignKey,
+)
 from sqlalchemy import select
 
 from sqlalchemy.orm import declarative_base

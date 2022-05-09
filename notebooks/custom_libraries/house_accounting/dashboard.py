@@ -47,11 +47,11 @@ for i in df.columns:
     tmp_dict = {"name": i, "id": i}
     if i == "amount":
         tmp_dict["type"] = "numeric"
-        tmp_dict["format"] = dict(specifier=',.2f')
+        tmp_dict["format"] = dict(specifier=",.2f")
         tmp_dict["filter_options"] = dict(case="sensitive")
     elif i == "date":
         tmp_dict["type"] = "datetime"
-    elif i in ["main_category","sub_category","time_category"]:
+    elif i in ["main_category", "sub_category", "time_category"]:
         tmp_dict["presentation"] = "dropdown"
         if i == "main_category":
             tmp_dict["editable"] = False
@@ -62,14 +62,20 @@ for i in df.columns:
     datatable_cols.append(tmp_dict)
 
 dropdown = {}
-dropdown["main_category"] = dict(options=[{'label': i.name, 'value': i.name} for i in list(MainCategory)])
-dropdown["sub_category"] = dict(options=[{'label': i.name, 'value': i.name} for i in list(SubCategory)])
-dropdown["time_category"] = dict(options=[{'label': i.name, 'value': i.name} for i in list(TimeCategory)])
+dropdown["main_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(MainCategory)]
+)
+dropdown["sub_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(SubCategory)]
+)
+dropdown["time_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(TimeCategory)]
+)
 
 main_table = dash_table.DataTable(
     id="adding-rows-table",
     columns=datatable_cols,
-    data=df.to_dict('records'),
+    data=df.to_dict("records"),
     editable=True,
     row_deletable=True,
     filter_action="native",
@@ -77,10 +83,10 @@ main_table = dash_table.DataTable(
     sort_mode="multi",
     row_selectable="multi",
     page_action="native",
-    page_current= 0,
-    page_size= 10,
+    page_current=0,
+    page_size=10,
     dropdown=dropdown,
-    filter_options=dict(case="insensitive")
+    filter_options=dict(case="insensitive"),
 )
 
 ### graphs
@@ -93,7 +99,9 @@ base_amnt_store = dcc.Store(id="base_amnt_store")
 
 ### buttons
 add_row_button = html.Button("Add Row", n_clicks=0, id="add_row_button")
-update_regression_button = html.Button("Update Regression", n_clicks=0, id="update_regression_button")
+update_regression_button = html.Button(
+    "Update Regression", n_clicks=0, id="update_regression_button"
+)
 show_diff_table_button = html.Button("Diff DataTable", id="show_diff_table_button")
 update_database_button = html.Button("Update Database", id="update_database_button")
 reset_filters_button = html.Button("Reset filters", id="reset_filters_button")
@@ -108,49 +116,57 @@ data_diff_store = dcc.Store(id="data_diff_store")
 
 ### upload
 upload_csv = dcc.Upload(
-    id='upload-data',
-    children=html.Div([
-        'Drag and Drop or ',
-        html.A('Select Files')
-    ]),
+    id="upload-data",
+    children=html.Div(["Drag and Drop or ", html.A("Select Files")]),
     style={
-        'width': '100%',
-        'height': '60px',
-        'lineHeight': '60px',
-        'borderWidth': '1px',
-        'borderStyle': 'dashed',
-        'borderRadius': '5px',
-        'textAlign': 'center',
-        'margin': '10px'
+        "width": "100%",
+        "height": "60px",
+        "lineHeight": "60px",
+        "borderWidth": "1px",
+        "borderStyle": "dashed",
+        "borderRadius": "5px",
+        "textAlign": "center",
+        "margin": "10px",
     },
-    multiple=True
+    multiple=True,
 )
 
 app.layout = html.Div(
     [
-        html.Div([
-        html.Div([add_row_button, update_regression_button, show_diff_table_button, update_database_button, reset_filters_button]),
-        upload_csv,
-        html.Br(),
-        main_table,
-        html.Hr(),
-        data_diff,
-        html.Hr(),
-        summary_text,
-        forecast_text,
-        html.Hr(),
-        plot_container,
-        main_series_store,
-        regression_series_store,
-        forecast_series_store,
-        main_df_store,
-        base_amnt_store,
-        data_diff_store,
-        ])
+        html.Div(
+            [
+                html.Div(
+                    [
+                        add_row_button,
+                        update_regression_button,
+                        show_diff_table_button,
+                        update_database_button,
+                        reset_filters_button,
+                    ]
+                ),
+                upload_csv,
+                html.Br(),
+                main_table,
+                html.Hr(),
+                data_diff,
+                html.Hr(),
+                summary_text,
+                forecast_text,
+                html.Hr(),
+                plot_container,
+                main_series_store,
+                regression_series_store,
+                forecast_series_store,
+                main_df_store,
+                base_amnt_store,
+                data_diff_store,
+            ]
+        )
     ]
 )
 
 ### Helpers
+
 
 def get_fit_df(input_df, past_amnt):
     fil_df = pd.get_dummies(
@@ -262,13 +278,14 @@ def get_fit_df(input_df, past_amnt):
 
     return predict_ci, fore_ci
 
+
 def diff_dashtable(data):
 
     new_df = pd.DataFrame(data=data)
 
     new_df["date"] = pd.to_datetime(new_df["date"])
 
-    return new_df[~new_df.apply(tuple,1).isin(df.apply(tuple,1))]
+    return new_df[~new_df.apply(tuple, 1).isin(df.apply(tuple, 1))]
 
 
 def filter_rows(inp_obj):
@@ -278,25 +295,25 @@ def filter_rows(inp_obj):
         except:
             pass
 
+
 def get_src_matching(input_sss):
-    mtch = df[
-        (df["amount"] == input_sss["amount"])
-        & (df["date"] == input_sss["date"])
-    ]
+    mtch = df[(df["amount"] == input_sss["amount"]) & (df["date"] == input_sss["date"])]
     return len(mtch.index)
 
 
 #######
 
+
 @app.callback(
-    Output(main_table, 'filter_query'),
-    [Input(reset_filters_button, 'n_clicks')],
-    [State(main_table, 'filter_query')],
+    Output(main_table, "filter_query"),
+    [Input(reset_filters_button, "n_clicks")],
+    [State(main_table, "filter_query")],
 )
 def clearFilter(n_clicks, state):
     if n_clicks is None:
-        return '' if state is None else state
-    return ''
+        return "" if state is None else state
+    return ""
+
 
 @app.callback(
     Output(data_diff, "children"),
@@ -306,7 +323,7 @@ def clearFilter(n_clicks, state):
         Input(update_database_button, "n_clicks"),
         Input(upload_csv, "contents"),
     ],
-    [        
+    [
         State(main_table, "data"),
         State(data_diff_store, "data"),
     ],
@@ -314,7 +331,7 @@ def clearFilter(n_clicks, state):
 def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff):
     ctx = dash.callback_context
 
-    trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger == "update_database_button":
         if n_clicks_update is None:
             raise PreventUpdate
@@ -332,7 +349,9 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     for ccc in session.execute(sss).scalars():
                         for index, value in row.items():
                             if index in Cashflow._unique_check_dict:
-                                new_elem = Cashflow.project_element(session, value, index)
+                                new_elem = Cashflow.project_element(
+                                    session, value, index
+                                )
                             else:
                                 new_elem = value
                             setattr(ccc, index, new_elem)
@@ -367,15 +386,18 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     new_entries += 1
             session.commit()
 
-        return f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}", None
+        return (
+            f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}",
+            None,
+        )
     elif trigger == "upload-data":
         if list_of_contents is not None:
 
             all_df = []
             for fff in list_of_contents:
-                content_type, content_string = fff.split(',')
+                content_type, content_string = fff.split(",")
                 decoded = base64.b64decode(content_string)
-                all_df.append(parse_extracted_csv(io.StringIO(decoded.decode('utf-8'))))
+                all_df.append(parse_extracted_csv(io.StringIO(decoded.decode("utf-8"))))
 
             res_df = pd.concat(all_df)
             res_df.drop_duplicates(
@@ -388,7 +410,9 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         msk = res_df.apply(get_src_matching, axis=1)
         allo = res_df[msk == 0].copy()
         allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
-        allo.time_category = allo.time_category.apply(lambda x: x.name).astype("category")
+        allo.time_category = allo.time_category.apply(lambda x: x.name).astype(
+            "category"
+        )
         allo.tags = allo.tags.apply(
             lambda x: [eee.lower().replace(" ", "") for eee in x]
         ).apply(sorted)
@@ -396,10 +420,10 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         allo.rename(columns={"tags": "tag"}, inplace=True)
 
         md_list = []
-        md_list.append(dcc.Markdown(f'Found {len(allo.index)} new entries'))
+        md_list.append(dcc.Markdown(f"Found {len(allo.index)} new entries"))
         for ido, row in allo.iterrows():
-            tmp_s = "; ".join([ f'{iii} -> {vvv}' for iii, vvv in row.items()])
-            tmp_s = f'{ido}: {tmp_s}'
+            tmp_s = "; ".join([f"{iii} -> {vvv}" for iii, vvv in row.items()])
+            tmp_s = f"{ido}: {tmp_s}"
             md_list.append(dcc.Markdown(tmp_s))
         return md_list, allo.to_json()
 
@@ -412,12 +436,13 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         if len(diff_store_data.index) > 0:
             md_list = []
             for ido, row in diff_store_data.iterrows():
-                tmp_s = "; ".join([ f'{iii} -> {vvv}' for iii, vvv in row.items()])
-                tmp_s = f'{ido}: {tmp_s}'
+                tmp_s = "; ".join([f"{iii} -> {vvv}" for iii, vvv in row.items()])
+                tmp_s = f"{ido}: {tmp_s}"
                 md_list.append(dcc.Markdown(tmp_s))
             return md_list, diff_store_data.to_json()
         else:
             return "No Changes to DataTable", None
+
 
 @app.callback(
     Output(main_table, "data"),
@@ -429,6 +454,7 @@ def add_row(n_clicks, rows, columns):
     if n_clicks > 0:
         rows.insert(0, {c["id"]: "" for c in columns})
     return rows
+
 
 @app.callback(
     Output(regression_series_store, "data"),
@@ -447,7 +473,9 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
 
         md_arro = []
         allo = forecast_df.iloc[-1]
-        md_arro.append(f'On {allo.name:%d-%m-%Y}: {allo["predicted_mean"]:,.2f}+{allo["upper cashflow"]:,.2f}-{allo["lower cashflow"]:,.2f}')
+        md_arro.append(
+            f'On {allo.name:%d-%m-%Y}: {allo["predicted_mean"]:,.2f}+{allo["upper cashflow"]:,.2f}-{allo["lower cashflow"]:,.2f}'
+        )
 
         md_text = "\n".join(md_arro)
 
@@ -461,7 +489,8 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
     Output(main_df_store, "data"),
     Output(base_amnt_store, "data"),
     Output(summary_text, "children"),
-    Input(main_table, "derived_virtual_data"),)
+    Input(main_table, "derived_virtual_data"),
+)
 def update_main_series(rows):
 
     dff = df.copy() if rows is None else pd.DataFrame(rows)
@@ -493,7 +522,6 @@ def update_main_series(rows):
         _,
     ) = AccountingDBManager.get_income_analysis(norm_df)
 
-
     base_amnt = 0
     min_date = datetime.min
     tmp_init_df = dff[dff.sub_category == SubCategory.Initial.name]
@@ -502,17 +530,15 @@ def update_main_series(rows):
         min_date = tmp_init_df.date.min()
     dff = dff[~(dff.sub_category == SubCategory.Initial.name)]
 
-    ser = (
-        dff.groupby("date")
-        .apply(lambda x: x.amount.sum())
-        .rename("bank account")
-    )
+    ser = dff.groupby("date").apply(lambda x: x.amount.sum()).rename("bank account")
     ser.sort_index(inplace=True)
     ser_cum_sum = ser.cumsum()
 
     md_arro = []
     md_arro.append(f"Base on {min_date:%d-%m-%Y}: {base_amnt:,.2f}")
-    md_arro.append(f"Saldo on {ser_cum_sum.index[-1]:%d-%m-%Y}: {ser_cum_sum[-1]:,.2f} ({ser_cum_sum[-1]+base_amnt:,.2f})")
+    md_arro.append(
+        f"Saldo on {ser_cum_sum.index[-1]:%d-%m-%Y}: {ser_cum_sum[-1]:,.2f} ({ser_cum_sum[-1]+base_amnt:,.2f})"
+    )
 
     dict_1 = {}
     dict_1["Yearly"] = {"value": frac_years, "fmt": ".2f"}
@@ -538,9 +564,15 @@ def update_main_series(rows):
     md_text = "\n".join(md_arro)
 
     if len(ser.index) > 0:
-        return ser.to_json(), dff.to_json(), json.dumps({"base_amnt": base_amnt}), md_text
+        return (
+            ser.to_json(),
+            dff.to_json(),
+            json.dumps({"base_amnt": base_amnt}),
+            md_text,
+        )
     else:
         raise PreventUpdate
+
 
 @app.callback(
     Output(plot_container, "children"),
@@ -549,16 +581,23 @@ def update_main_series(rows):
     Input(forecast_series_store, "data"),
     State(base_amnt_store, "data"),
     State(main_df_store, "data"),
-    )
-def update_graphs(json_main_series, json_regression_series, json_forecast_series, json_base_amnt, json_main_df):
+)
+def update_graphs(
+    json_main_series,
+    json_regression_series,
+    json_forecast_series,
+    json_base_amnt,
+    json_main_df,
+):
 
-    fig = make_subplots(rows=2, cols=2,
-                    shared_xaxes=False,
-                    vertical_spacing=0.05,
-                    specs=[[{}, {"rowspan": 2, "type": "domain"}],
-                           [{}, None]],
-                    column_widths=[0.7, 0.3],
-                    )
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        shared_xaxes=False,
+        vertical_spacing=0.05,
+        specs=[[{}, {"rowspan": 2, "type": "domain"}], [{}, None]],
+        column_widths=[0.7, 0.3],
+    )
 
     if json_main_series:
         ser = pd.read_json(json_main_series, typ="series")
@@ -605,7 +644,7 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
                 measure=measures,
                 y=values,
                 base=base_amnt,
-                name="Cashflow"
+                name="Cashflow",
             ),
             row=2,
             col=1,
@@ -615,13 +654,19 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
         dff["amount"] = np.abs(dff["amount"])
 
         fig.add_trace(
-            list(px.sunburst(
-                dff,
-                path=["main_category", "sub_category", "time_category", "tag"],
-                values="amount",
-                color='main_category',
-                color_discrete_map={'(?)':'black', 'Income':'green', 'Outcome':'red'}
-            ).select_traces())[0],
+            list(
+                px.sunburst(
+                    dff,
+                    path=["main_category", "sub_category", "time_category", "tag"],
+                    values="amount",
+                    color="main_category",
+                    color_discrete_map={
+                        "(?)": "black",
+                        "Income": "green",
+                        "Outcome": "red",
+                    },
+                ).select_traces()
+            )[0],
             row=1,
             col=2,
         )
@@ -710,7 +755,11 @@ def update_graphs(json_main_series, json_regression_series, json_forecast_series
         waterfallgap=0.3,
     )
 
-    return [dcc.Graph(figure=fig,)]
+    return [
+        dcc.Graph(
+            figure=fig,
+        )
+    ]
 
 
 if __name__ == "__main__":
