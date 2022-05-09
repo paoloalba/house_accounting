@@ -17,7 +17,7 @@ from dash.exceptions import PreventUpdate
 from plotly.subplots import make_subplots
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, delete
 
 sys.path.append(os.getenv("GLOBAL_LIBRARIES_PATH", ""))
 sys.path = list(set(sys.path))
@@ -34,7 +34,7 @@ original_pmt_storage = os.getenv("PMT_STG_PATH")
 pmt_storage = os.path.join(original_pmt_storage, "house_accounting")
 os.makedirs(pmt_storage, exist_ok=True)
 
-db_path = os.path.join(pmt_storage, global_config["automatic_parsed_db_name"])
+db_path = os.path.join(pmt_storage, global_config["example_db_name"])
 acc_table = AccountingTable(db_path)
 
 df = acc_table.get_df()
@@ -42,24 +42,26 @@ df["date"] = pd.to_datetime(df["date"])
 
 app = Dash(__name__)
 
-datatable_cols = []
-for i in df.columns:
-    tmp_dict = {"name": i, "id": i}
-    if i == "amount":
-        tmp_dict["type"] = "numeric"
-        tmp_dict["format"] = dict(specifier=",.2f")
-        tmp_dict["filter_options"] = dict(case="sensitive")
-    elif i == "date":
-        tmp_dict["type"] = "datetime"
-    elif i in ["main_category", "sub_category", "time_category"]:
-        tmp_dict["presentation"] = "dropdown"
-        if i == "main_category":
+def create_table_col_spec(input_df):
+    datatable_cols = []
+    for i in input_df.columns:
+        tmp_dict = {"name": i, "id": i}
+        if i == "amount":
+            tmp_dict["type"] = "numeric"
+            tmp_dict["format"] = dict(specifier=",.2f")
+            tmp_dict["filter_options"] = dict(case="sensitive")
+        elif i == "date":
+            tmp_dict["type"] = "datetime"
+        elif i in ["main_category", "sub_category", "time_category"]:
+            tmp_dict["presentation"] = "dropdown"
+            if i == "main_category":
+                tmp_dict["editable"] = False
+        elif i == "id":
             tmp_dict["editable"] = False
-    elif i == "id":
-        tmp_dict["editable"] = False
-        tmp_dict["type"] = "numeric"
-        tmp_dict["filter_options"] = dict(case="sensitive")
-    datatable_cols.append(tmp_dict)
+            tmp_dict["type"] = "numeric"
+            tmp_dict["filter_options"] = dict(case="sensitive")
+        datatable_cols.append(tmp_dict)
+    return datatable_cols
 
 dropdown = {}
 dropdown["main_category"] = dict(
@@ -74,7 +76,7 @@ dropdown["time_category"] = dict(
 
 main_table = dash_table.DataTable(
     id="adding-rows-table",
-    columns=datatable_cols,
+    columns=create_table_col_spec(df),
     data=df.to_dict("records"),
     editable=True,
     row_deletable=True,
@@ -113,6 +115,7 @@ data_diff = html.Div(id="data_diff")
 
 ### stores
 data_diff_store = dcc.Store(id="data_diff_store")
+removed_data_diff_store = dcc.Store(id="removed_data_diff_store")
 
 ### upload
 upload_csv = dcc.Upload(
@@ -160,6 +163,7 @@ app.layout = html.Div(
                 main_df_store,
                 base_amnt_store,
                 data_diff_store,
+                removed_data_diff_store,
             ]
         )
     ]
@@ -285,7 +289,7 @@ def diff_dashtable(data):
 
     new_df["date"] = pd.to_datetime(new_df["date"])
 
-    return new_df[~new_df.apply(tuple, 1).isin(df.apply(tuple, 1))]
+    return new_df[~new_df.apply(tuple, 1).isin(df.apply(tuple, 1))], df[~df.apply(tuple, 1).isin(new_df.apply(tuple, 1))]
 
 
 def filter_rows(inp_obj):
@@ -318,6 +322,7 @@ def clearFilter(n_clicks, state):
 @app.callback(
     Output(data_diff, "children"),
     Output(data_diff_store, "data"),
+    Output(removed_data_diff_store, "data"),
     [
         Input(show_diff_table_button, "n_clicks"),
         Input(update_database_button, "n_clicks"),
@@ -326,9 +331,10 @@ def clearFilter(n_clicks, state):
     [
         State(main_table, "data"),
         State(data_diff_store, "data"),
+        State(removed_data_diff_store, "data"),
     ],
 )
-def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff):
+def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff, removed_data_diff):
     ctx = dash.callback_context
 
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
@@ -337,10 +343,12 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
             raise PreventUpdate
 
         dff = pd.read_json(data_diff, typ="frame")
+        rem_dff = pd.read_json(removed_data_diff, typ="frame")
 
         with Session(acc_table.db_engine) as session:
             new_entries = 0
             updated_entries = 0
+            removed_entries = 0
             for ido, row in dff.iterrows():
                 if ("id" in row.index) and row["id"]:
                     sel_ids = [row["id"]]
@@ -384,10 +392,18 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     )
                     session.add(cfl_entry)
                     new_entries += 1
-            session.commit()
 
+            for ido, row in rem_dff.iterrows():
+                if ("id" in row.index) and row["id"]:
+                    sel_ids = [row["id"]]
+
+                    ddd = delete(Cashflow).where(Cashflow.id.in_(sel_ids))
+                    session.execute(ddd)
+                    removed_entries += 1
+            session.commit()
         return (
-            f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}",
+            f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}, removed -> {removed_entries}",
+            None,
             None,
         )
     elif trigger == "upload-data":
@@ -421,27 +437,97 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
 
         md_list = []
         md_list.append(dcc.Markdown(f"Found {len(allo.index)} new entries"))
-        for ido, row in allo.iterrows():
-            tmp_s = "; ".join([f"{iii} -> {vvv}" for iii, vvv in row.items()])
-            tmp_s = f"{ido}: {tmp_s}"
-            md_list.append(dcc.Markdown(tmp_s))
-        return md_list, allo.to_json()
+
+        dt_df = allo.copy()
+        dt_df.tag = dt_df.tag.apply(lambda x: ";".join(x))
+        tmp_table = dash_table.DataTable(
+            columns=create_table_col_spec(dt_df),
+            data=dt_df.to_dict("records"),
+            editable=False,
+            row_deletable=False,
+            filter_action="native",
+            sort_action="native",
+            sort_mode="multi",
+            page_action="native",
+            page_current=0,
+            page_size=10,
+            filter_options=dict(case="insensitive"),
+        )
+        md_list.append(tmp_table)
+
+        return md_list, allo.to_json(), None
 
     else:
         if n_clicks_show is None:
             raise PreventUpdate
 
-        diff_store_data = diff_dashtable(data)
+        diff_store_data, removed_data = diff_dashtable(data)
 
-        if len(diff_store_data.index) > 0:
+        if len(diff_store_data.index) > 0 or len(removed_data.index):
             md_list = []
-            for ido, row in diff_store_data.iterrows():
-                tmp_s = "; ".join([f"{iii} -> {vvv}" for iii, vvv in row.items()])
-                tmp_s = f"{ido}: {tmp_s}"
-                md_list.append(dcc.Markdown(tmp_s))
-            return md_list, diff_store_data.to_json()
+
+            if len(diff_store_data.index) > 0:
+                dt_df = diff_store_data.copy()
+                tmp_table = dash_table.DataTable(
+                    columns=create_table_col_spec(dt_df),
+                    data=dt_df.to_dict("records"),
+                    editable=False,
+                    row_deletable=False,
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    page_current=0,
+                    page_size=10,
+                    filter_options=dict(case="insensitive"),
+                )
+                md_list.append(dcc.Markdown("Modified rows"))
+                md_list.append(tmp_table)
+
+            if len(removed_data.index) > 0:
+                if len(diff_store_data.index) > 0:
+                    msk_2 = removed_data.id.isin(diff_store_data.id)
+                    pre_mod_data = removed_data[msk_2]
+                    removed_data = removed_data[~msk_2]
+
+                    if len(pre_mod_data.index) > 0:
+                        dt_df = pre_mod_data.copy()
+                        tmp_table = dash_table.DataTable(
+                            columns=create_table_col_spec(dt_df),
+                            data=dt_df.to_dict("records"),
+                            editable=False,
+                            row_deletable=False,
+                            filter_action="native",
+                            sort_action="native",
+                            sort_mode="multi",
+                            page_action="native",
+                            page_current=0,
+                            page_size=10,
+                            filter_options=dict(case="insensitive"),
+                        )
+                        md_list.append(dcc.Markdown("Original rows"))
+                        md_list.append(tmp_table)
+
+                dt_df = removed_data.copy()
+                tmp_table = dash_table.DataTable(
+                    columns=create_table_col_spec(dt_df),
+                    data=dt_df.to_dict("records"),
+                    editable=False,
+                    row_deletable=False,
+                    filter_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    page_current=0,
+                    page_size=10,
+                    filter_options=dict(case="insensitive"),
+                )
+                md_list.append(dcc.Markdown("Removed rows"))
+                md_list.append(tmp_table)
+
+            return md_list, diff_store_data.to_json(), removed_data.to_json()
         else:
-            return "No Changes to DataTable", None
+            return "No Changes to DataTable", None, None
 
 
 @app.callback(
