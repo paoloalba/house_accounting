@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import dash
+import base64
+import io
 
 import numpy as np
 import pandas as pd
@@ -25,6 +27,8 @@ from house_accounting.enumerators import SampleFrequency
 from house_accounting.widgets import AccountingDBManager
 from config import global_config
 from house_accounting.models import Cashflow
+from generic_helpers.row_filters import filters
+from generic_helpers.generic import parse_extracted_csv
 
 original_pmt_storage = os.getenv("PMT_STG_PATH")
 pmt_storage = os.path.join(original_pmt_storage, "house_accounting")
@@ -102,11 +106,31 @@ data_diff = html.Div(id="data_diff")
 ### stores
 data_diff_store = dcc.Store(id="data_diff_store")
 
+### upload
+upload_csv = dcc.Upload(
+    id='upload-data',
+    children=html.Div([
+        'Drag and Drop or ',
+        html.A('Select Files')
+    ]),
+    style={
+        'width': '100%',
+        'height': '60px',
+        'lineHeight': '60px',
+        'borderWidth': '1px',
+        'borderStyle': 'dashed',
+        'borderRadius': '5px',
+        'textAlign': 'center',
+        'margin': '10px'
+    },
+    multiple=True
+)
 
 app.layout = html.Div(
     [
         html.Div([
         html.Div([add_row_button, update_regression_button, show_diff_table_button, update_database_button, reset_filters_button]),
+        upload_csv,
         html.Br(),
         main_table,
         html.Hr(),
@@ -246,6 +270,22 @@ def diff_dashtable(data):
 
     return new_df[~new_df.apply(tuple,1).isin(df.apply(tuple,1))]
 
+
+def filter_rows(inp_obj):
+    for _, fff in filters.items():
+        try:
+            return pd.Series(fff.map_row(inp_obj))
+        except:
+            pass
+
+def get_src_matching(input_sss):
+    mtch = df[
+        (df["amount"] == input_sss["amount"])
+        & (df["date"] == input_sss["date"])
+    ]
+    return len(mtch.index)
+
+
 #######
 
 @app.callback(
@@ -263,14 +303,15 @@ def clearFilter(n_clicks, state):
     Output(data_diff_store, "data"),
     [
         Input(show_diff_table_button, "n_clicks"),
-        Input(update_database_button, "n_clicks")
+        Input(update_database_button, "n_clicks"),
+        Input(upload_csv, "contents"),
     ],
     [        
         State(main_table, "data"),
         State(data_diff_store, "data"),
     ],
 )
-def update_output(n_clicks_show, n_clicks_update, data, data_diff):
+def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff):
     ctx = dash.callback_context
 
     trigger = ctx.triggered[0]['prop_id'].split('.')[0]
@@ -284,7 +325,7 @@ def update_output(n_clicks_show, n_clicks_update, data, data_diff):
             new_entries = 0
             updated_entries = 0
             for ido, row in dff.iterrows():
-                if row["id"]:
+                if ("id" in row.index) and row["id"]:
                     sel_ids = [row["id"]]
 
                     sss = select(Cashflow).where(Cashflow.id.in_(sel_ids))
@@ -301,21 +342,67 @@ def update_output(n_clicks_show, n_clicks_update, data, data_diff):
                         main_cat = MainCategory.Income
                     else:
                         main_cat = MainCategory.Outcome
+
+                    if isinstance(row.tag, list):
+                        tmp_tag = row.tag
+                    else:
+                        tmp_tag = row.tag.split(";")
+
+                    if row.description:
+                        tmp_descr = row.description
+                    else:
+                        tmp_descr = ""
+
                     cfl_entry = Cashflow(
                         session=session,
                         date=row.date,
                         amount=row.amount,
-                        description=row.description,
-                        main_category=row.main_category,
+                        description=tmp_descr,
+                        main_category=main_cat,
                         sub_category=row.sub_category,
                         time_category=row.time_category,
-                        tags=row.tag.split(";"),
+                        tags=tmp_tag,
                     )
                     session.add(cfl_entry)
                     new_entries += 1
             session.commit()
 
         return f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}", None
+    elif trigger == "upload-data":
+        if list_of_contents is not None:
+
+            all_df = []
+            for fff in list_of_contents:
+                content_type, content_string = fff.split(',')
+                decoded = base64.b64decode(content_string)
+                all_df.append(parse_extracted_csv(io.StringIO(decoded.decode('utf-8'))))
+
+            res_df = pd.concat(all_df)
+            res_df.drop_duplicates(
+                inplace=True,
+                ignore_index=True,
+            )
+
+        res_df = res_df.apply(filter_rows, axis=1)
+
+        msk = res_df.apply(get_src_matching, axis=1)
+        allo = res_df[msk == 0].copy()
+        allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
+        allo.time_category = allo.time_category.apply(lambda x: x.name).astype("category")
+        allo.tags = allo.tags.apply(
+            lambda x: [eee.lower().replace(" ", "") for eee in x]
+        ).apply(sorted)
+
+        allo.rename(columns={"tags": "tag"}, inplace=True)
+
+        md_list = []
+        md_list.append(dcc.Markdown(f'Found {len(allo.index)} new entries'))
+        for ido, row in allo.iterrows():
+            tmp_s = "; ".join([ f'{iii} -> {vvv}' for iii, vvv in row.items()])
+            tmp_s = f'{ido}: {tmp_s}'
+            md_list.append(dcc.Markdown(tmp_s))
+        return md_list, allo.to_json()
+
     else:
         if n_clicks_show is None:
             raise PreventUpdate
