@@ -37,11 +37,7 @@ os.makedirs(pmt_storage, exist_ok=True)
 db_path = os.path.join(pmt_storage, global_config["example_db_name"])
 acc_table = AccountingTable(db_path)
 
-df = acc_table.get_df()
-df["date"] = pd.to_datetime(df["date"])
-
-app = Dash(__name__)
-
+### Helpers
 def create_table_col_spec(input_df):
     datatable_cols = []
     for i in input_df.columns:
@@ -62,116 +58,6 @@ def create_table_col_spec(input_df):
             tmp_dict["filter_options"] = dict(case="sensitive")
         datatable_cols.append(tmp_dict)
     return datatable_cols
-
-dropdown = {}
-dropdown["main_category"] = dict(
-    options=[{"label": i.name, "value": i.name} for i in list(MainCategory)]
-)
-dropdown["sub_category"] = dict(
-    options=[{"label": i.name, "value": i.name} for i in list(SubCategory)]
-)
-dropdown["time_category"] = dict(
-    options=[{"label": i.name, "value": i.name} for i in list(TimeCategory)]
-)
-
-main_table = dash_table.DataTable(
-    id="adding-rows-table",
-    columns=create_table_col_spec(df),
-    data=df.to_dict("records"),
-    editable=True,
-    row_deletable=True,
-    filter_action="native",
-    sort_action="native",
-    sort_mode="multi",
-    row_selectable="multi",
-    page_action="native",
-    page_current=0,
-    page_size=10,
-    dropdown=dropdown,
-    filter_options=dict(case="insensitive"),
-)
-
-### graphs
-plot_container = html.Div()
-main_series_store = dcc.Store(id="main_series_store")
-regression_series_store = dcc.Store(id="regression_series_store")
-forecast_series_store = dcc.Store(id="forecast_series_store")
-main_df_store = dcc.Store(id="main_df_store")
-base_amnt_store = dcc.Store(id="base_amnt_store")
-
-### buttons
-add_row_button = html.Button("Add Row", n_clicks=0, id="add_row_button")
-update_regression_button = html.Button(
-    "Update Regression", n_clicks=0, id="update_regression_button"
-)
-show_diff_table_button = html.Button("Diff DataTable", id="show_diff_table_button")
-update_database_button = html.Button("Update Database", id="update_database_button")
-reset_filters_button = html.Button("Reset filters", id="reset_filters_button")
-
-### Text
-summary_text = dcc.Markdown(style={"white-space": "pre"})
-forecast_text = dcc.Markdown(style={"white-space": "pre"})
-data_diff = html.Div(id="data_diff")
-
-### stores
-data_diff_store = dcc.Store(id="data_diff_store")
-removed_data_diff_store = dcc.Store(id="removed_data_diff_store")
-
-### upload
-upload_csv = dcc.Upload(
-    id="upload-data",
-    children=html.Div(["Drag and Drop or ", html.A("Select Files")]),
-    style={
-        "width": "100%",
-        "height": "60px",
-        "lineHeight": "60px",
-        "borderWidth": "1px",
-        "borderStyle": "dashed",
-        "borderRadius": "5px",
-        "textAlign": "center",
-        "margin": "10px",
-    },
-    multiple=True,
-)
-
-app.layout = html.Div(
-    [
-        html.Div(
-            [
-                html.Div(
-                    [
-                        add_row_button,
-                        update_regression_button,
-                        show_diff_table_button,
-                        update_database_button,
-                        reset_filters_button,
-                    ]
-                ),
-                upload_csv,
-                html.Br(),
-                main_table,
-                html.Hr(),
-                data_diff,
-                html.Hr(),
-                summary_text,
-                forecast_text,
-                html.Hr(),
-                plot_container,
-                main_series_store,
-                regression_series_store,
-                forecast_series_store,
-                main_df_store,
-                base_amnt_store,
-                data_diff_store,
-                removed_data_diff_store,
-            ]
-        )
-    ]
-)
-
-### Helpers
-
-
 def get_fit_df(input_df, past_amnt):
     fil_df = pd.get_dummies(
         input_df, columns=["main_category", "sub_category", "time_category"]
@@ -281,33 +167,143 @@ def get_fit_df(input_df, past_amnt):
     fore_ci.sort_index(inplace=True)
 
     return predict_ci, fore_ci
+def diff_dashtable(new_data, old_df):
 
-
-def diff_dashtable(data):
-
-    new_df = pd.DataFrame(data=data)
+    new_df = pd.DataFrame(data=new_data)
 
     new_df["date"] = pd.to_datetime(new_df["date"])
+    new_df["amount"] = new_df["amount"].apply(lambda x: np.round(x, 2) if isinstance(x, float) else x)
 
-    return new_df[~new_df.apply(tuple, 1).isin(df.apply(tuple, 1))], df[~df.apply(tuple, 1).isin(new_df.apply(tuple, 1))]
+    old_df["date"] = pd.to_datetime(old_df["date"])
+    old_df["amount"] = old_df["amount"].apply(lambda x: np.round(x, 2) if isinstance(x, float) else x)
 
-
+    return new_df[~new_df.apply(tuple, 1).isin(old_df.apply(tuple, 1))], old_df[~old_df.apply(tuple, 1).isin(new_df.apply(tuple, 1))]
 def filter_rows(inp_obj):
     for _, fff in filters.items():
         try:
             return pd.Series(fff.map_row(inp_obj))
         except:
             pass
-
-
-def get_src_matching(input_sss):
-    mtch = df[(df["amount"] == input_sss["amount"]) & (df["date"] == input_sss["date"])]
+def get_src_matching(input_sss, old_df):
+    mtch = old_df[(old_df["amount"] == input_sss["amount"]) & (old_df["date"] == input_sss["date"])]
     return len(mtch.index)
-
-
 #######
 
+app = Dash(__name__)
 
+dropdown = {}
+dropdown["main_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(MainCategory)]
+)
+dropdown["sub_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(SubCategory)]
+)
+dropdown["time_category"] = dict(
+    options=[{"label": i.name, "value": i.name} for i in list(TimeCategory)]
+)
+
+tmp_df = acc_table.get_df()
+tmp_df["date"] = pd.to_datetime(tmp_df["date"])
+main_table = dash_table.DataTable(
+    columns=create_table_col_spec(tmp_df),
+    data=tmp_df.to_dict("records"),
+    editable=True,
+    row_deletable=True,
+    filter_action="native",
+    sort_action="native",
+    sort_mode="multi",
+    row_selectable="multi",
+    page_action="native",
+    page_current=0,
+    page_size=10,
+    dropdown=dropdown,
+    filter_options=dict(case="insensitive"),
+)
+
+### graphs
+plot_container = html.Div()
+main_series_store = dcc.Store(id="main_series_store")
+regression_series_store = dcc.Store(id="regression_series_store")
+forecast_series_store = dcc.Store(id="forecast_series_store")
+main_df_store = dcc.Store(id="main_df_store")
+base_amnt_store = dcc.Store(id="base_amnt_store")
+
+### buttons
+add_row_button = html.Button("Add Row", id="add_row_button")
+update_regression_button = html.Button(
+    "Update Regression", id="update_regression_button"
+)
+show_diff_table_button = html.Button("Diff DataTable", id="show_diff_table_button")
+update_database_button = html.Button("Update Database", id="update_database_button")
+reset_filters_button = html.Button("Reset filters", id="reset_filters_button")
+refresh_main_df_button = html.Button("Refresh main df", id="refresh_main_df_button")
+
+### Text
+summary_text = dcc.Markdown(style={"white-space": "pre"})
+forecast_text = dcc.Markdown(style={"white-space": "pre"})
+data_diff = html.Div(id="data_diff")
+
+### stores
+cached_df_store = dcc.Store(id="cached_df_store", data=tmp_df.to_json())
+data_diff_store = dcc.Store(id="data_diff_store")
+removed_data_diff_store = dcc.Store(id="removed_data_diff_store")
+
+### upload
+upload_csv = dcc.Upload(
+    id="upload_csv",
+    children=html.Div(["Drag and Drop or ", html.A("Select Files")]),
+    style={
+        "width": "100%",
+        "height": "60px",
+        "lineHeight": "60px",
+        "borderWidth": "1px",
+        "borderStyle": "dashed",
+        "borderRadius": "5px",
+        "textAlign": "center",
+        "margin": "10px",
+    },
+    multiple=True,
+)
+
+### main layouy
+app.layout = html.Div(
+    [
+        html.Div(
+            [
+                html.Div(
+                    [
+                        refresh_main_df_button,
+                        add_row_button,
+                        update_regression_button,
+                        show_diff_table_button,
+                        update_database_button,
+                        reset_filters_button,
+                    ]
+                ),
+                upload_csv,
+                html.Br(),
+                main_table,
+                html.Hr(),
+                data_diff,
+                html.Hr(),
+                summary_text,
+                forecast_text,
+                html.Hr(),
+                plot_container,
+                main_series_store,
+                regression_series_store,
+                forecast_series_store,
+                main_df_store,
+                base_amnt_store,
+                data_diff_store,
+                removed_data_diff_store,
+                cached_df_store,
+            ]
+        )
+    ]
+)
+
+### Callbacks
 @app.callback(
     Output(main_table, "filter_query"),
     [Input(reset_filters_button, "n_clicks")],
@@ -317,8 +313,6 @@ def clearFilter(n_clicks, state):
     if n_clicks is None:
         return "" if state is None else state
     return ""
-
-
 @app.callback(
     Output(data_diff, "children"),
     Output(data_diff_store, "data"),
@@ -332,18 +326,22 @@ def clearFilter(n_clicks, state):
         State(main_table, "data"),
         State(data_diff_store, "data"),
         State(removed_data_diff_store, "data"),
+        State(cached_df_store, "data"),
     ],
 )
-def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff, removed_data_diff):
+def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff, removed_data_diff, cached_df_store_data):
     ctx = dash.callback_context
-
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+
     if trigger == "update_database_button":
         if n_clicks_update is None:
             raise PreventUpdate
 
         dff = pd.read_json(data_diff, typ="frame")
-        rem_dff = pd.read_json(removed_data_diff, typ="frame")
+        if removed_data_diff:
+            rem_dff = pd.read_json(removed_data_diff, typ="frame")
+        else:
+            rem_dff = None
 
         with Session(acc_table.db_engine) as session:
             new_entries = 0
@@ -392,21 +390,21 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     )
                     session.add(cfl_entry)
                     new_entries += 1
+            if rem_dff:
+                for ido, row in rem_dff.iterrows():
+                    if ("id" in row.index) and row["id"]:
+                        sel_ids = [row["id"]]
 
-            for ido, row in rem_dff.iterrows():
-                if ("id" in row.index) and row["id"]:
-                    sel_ids = [row["id"]]
-
-                    ddd = delete(Cashflow).where(Cashflow.id.in_(sel_ids))
-                    session.execute(ddd)
-                    removed_entries += 1
+                        ddd = delete(Cashflow).where(Cashflow.id.in_(sel_ids))
+                        session.execute(ddd)
+                        removed_entries += 1
             session.commit()
         return (
             f"Updated {len(dff.index)} entries: updated -> {updated_entries}, new -> {new_entries}, removed -> {removed_entries}",
             None,
             None,
         )
-    elif trigger == "upload-data":
+    elif trigger == "upload_csv":
         if list_of_contents is not None:
 
             all_df = []
@@ -423,7 +421,7 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
 
         res_df = res_df.apply(filter_rows, axis=1)
 
-        msk = res_df.apply(get_src_matching, axis=1)
+        msk = res_df.apply(get_src_matching, axis=1, args=(pd.read_json(cached_df_store_data, typ="frame"),))
         allo = res_df[msk == 0].copy()
         allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
         allo.time_category = allo.time_category.apply(lambda x: x.name).astype(
@@ -456,14 +454,13 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         md_list.append(tmp_table)
 
         return md_list, allo.to_json(), None
-
-    else:
+    elif trigger == "show_diff_table_button":
         if n_clicks_show is None:
             raise PreventUpdate
 
-        diff_store_data, removed_data = diff_dashtable(data)
+        diff_store_data, removed_data = diff_dashtable(data, pd.read_json(cached_df_store_data, typ="frame"))
 
-        if len(diff_store_data.index) > 0 or len(removed_data.index):
+        if len(diff_store_data.index) > 0 or len(removed_data.index) > 0:
             md_list = []
 
             if len(diff_store_data.index) > 0:
@@ -528,20 +525,34 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
             return md_list, diff_store_data.to_json(), removed_data.to_json()
         else:
             return "No Changes to DataTable", None, None
-
-
+    else:
+        raise PreventUpdate
 @app.callback(
     Output(main_table, "data"),
+    Output(main_table, "columns"),
+    Output(cached_df_store, "data"),
     Input(add_row_button, "n_clicks"),
+    Input(refresh_main_df_button, "n_clicks"),
     State(main_table, "data"),
     State(main_table, "columns"),
+    State(cached_df_store, "data"),
 )
-def add_row(n_clicks, rows, columns):
-    if n_clicks > 0:
-        rows.insert(0, {c["id"]: "" for c in columns})
-    return rows
+def update_main_table_data(add_row_n_clicks, refresh_n_clicks, rows, columns, cached_df_data):
+    ctx = dash.callback_context
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
+    if trigger == "add_row_button":
+        if add_row_n_clicks > 0:
+            rows.insert(0, {c["id"]: "" for c in columns})
+        return rows, columns, cached_df_data
+    elif trigger == "refresh_main_df_button":
+        if refresh_n_clicks > 0:
+            df = acc_table.get_df()
+            df["date"] = pd.to_datetime(df["date"])
 
+            return df.to_dict("records"), create_table_col_spec(df), df.to_json()
+    else:
+        raise PreventUpdate
 @app.callback(
     Output(regression_series_store, "data"),
     Output(forecast_series_store, "data"),
@@ -551,7 +562,7 @@ def add_row(n_clicks, rows, columns):
     State(base_amnt_store, "data"),
 )
 def update_regression(n_clicks, json_main_df, json_base_amnt):
-    if n_clicks > 0:
+    if n_clicks:
         dff = pd.read_json(json_main_df, typ="frame")
         base_amnt = json.loads(json_base_amnt)["base_amnt"]
 
@@ -568,18 +579,17 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
         return regr_df.to_json(), forecast_df.to_json(), md_text
     else:
         raise PreventUpdate
-
-
 @app.callback(
     Output(main_series_store, "data"),
     Output(main_df_store, "data"),
     Output(base_amnt_store, "data"),
     Output(summary_text, "children"),
     Input(main_table, "derived_virtual_data"),
+    State(cached_df_store, "data")
 )
-def update_main_series(rows):
+def update_main_series(rows, cached_df_store_data):
 
-    dff = df.copy() if rows is None else pd.DataFrame(rows)
+    dff = pd.read_json(cached_df_store_data, typ="frame") if rows is None else pd.DataFrame(rows)
     dff = dff[dff["id"] != ""]
     if len(dff.index) == 0:
         raise PreventUpdate
@@ -658,8 +668,6 @@ def update_main_series(rows):
         )
     else:
         raise PreventUpdate
-
-
 @app.callback(
     Output(plot_container, "children"),
     Input(main_series_store, "data"),
@@ -846,7 +854,7 @@ def update_graphs(
             figure=fig,
         )
     ]
-
+#######
 
 if __name__ == "__main__":
     app.run_server(host="0.0.0.0", debug=False)
