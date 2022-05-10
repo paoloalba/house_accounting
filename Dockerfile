@@ -10,7 +10,6 @@ RUN pip install plotly
 # RUN pip install cookiecutter
 # RUN npm install --global yarn
 
-
 FROM base as debug
 RUN pip install ptvsd
 
@@ -18,13 +17,5 @@ CMD ["python", "-m", "ptvsd", "--host", "0.0.0.0", "--port", "8889", "--wait", "
 
 FROM base as prod
 RUN pip install ipywidgets==8.0.0rc0
-
-CMD ["jupyter", "lab", "--ip", "0.0.0.0"]
-
-FROM base as ipyaggrid
-RUN pip install ipyaggrid
-RUN jupyter labextension install ipyaggrid @jupyter-widgets/jupyterlab-manager
-RUN pip install ipysheet
-# RUN jupyter labextension install ipysheet
 
 CMD ["jupyter", "lab", "--ip", "0.0.0.0"]
