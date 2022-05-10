@@ -463,10 +463,31 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         if len(diff_store_data.index) > 0 or len(removed_data.index) > 0:
             md_list = []
 
-            if len(diff_store_data.index) > 0:
-                dt_df = diff_store_data.copy()
+            if len(removed_data.index)>0 and len(diff_store_data.index)>0:
+                msk_2 = removed_data.id.isin(diff_store_data.id)
+                pre_mod_data = removed_data[msk_2]
+                removed_data = removed_data[~msk_2]
+
+                all_df = []
+                for ido, rrr in pre_mod_data.iterrows():
+                    or_r = diff_store_data[diff_store_data["id"] == rrr["id"]]
+                    tmp_dict = {}
+                    for iii, vvv in or_r.items():
+                        v1 = vvv.values[0]
+                        v2 = rrr[iii]
+                        if v1 == v2:
+                            tmp_dict[iii] = str(v1)
+                        else:
+                            tmp_dict[iii] = f'{v2} -> {v1}'
+                    all_df.append(tmp_dict)
+                pre_mod_data = pd.DataFrame.from_records(all_df)
+            else:
+                pre_mod_data = diff_store_data.copy()
+
+            if len(pre_mod_data.index) > 0:
+                dt_df = pre_mod_data.copy()
                 tmp_table = dash_table.DataTable(
-                    columns=create_table_col_spec(dt_df),
+                    columns=[{"name": i, "id": i} for i in dt_df.columns],
                     data=dt_df.to_dict("records"),
                     editable=False,
                     row_deletable=False,
@@ -477,34 +498,11 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     page_current=0,
                     page_size=10,
                     filter_options=dict(case="insensitive"),
+                    style_data_conditional=[{'if': {'filter_query': '{{{}}} contains ->'.format(col), 'column_id': col}, 'backgroundColor': '#FF4136', 'color': 'white'} for col in dt_df.columns]
                 )
                 md_list.append(dcc.Markdown("Modified rows"))
                 md_list.append(tmp_table)
-
             if len(removed_data.index) > 0:
-                if len(diff_store_data.index) > 0:
-                    msk_2 = removed_data.id.isin(diff_store_data.id)
-                    pre_mod_data = removed_data[msk_2]
-                    removed_data = removed_data[~msk_2]
-
-                    if len(pre_mod_data.index) > 0:
-                        dt_df = pre_mod_data.copy()
-                        tmp_table = dash_table.DataTable(
-                            columns=create_table_col_spec(dt_df),
-                            data=dt_df.to_dict("records"),
-                            editable=False,
-                            row_deletable=False,
-                            filter_action="native",
-                            sort_action="native",
-                            sort_mode="multi",
-                            page_action="native",
-                            page_current=0,
-                            page_size=10,
-                            filter_options=dict(case="insensitive"),
-                        )
-                        md_list.append(dcc.Markdown("Original rows"))
-                        md_list.append(tmp_table)
-
                 dt_df = removed_data.copy()
                 tmp_table = dash_table.DataTable(
                     columns=create_table_col_spec(dt_df),
