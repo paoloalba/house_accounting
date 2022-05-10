@@ -8,6 +8,12 @@ RUN pip install pyyaml
 RUN pip install statsmodels
 RUN pip install ipywidgets
 
+FROM base as debug
+RUN pip install ptvsd
+
+CMD ["python", "-m", "ptvsd", "--host", "0.0.0.0", "--port", "8889", "--wait", "/home/jovyan/custom_libraries/house_accounting/dashboard.py"]
+
+
 FROM base as dashboard
 
 # COPY ./check.sh .

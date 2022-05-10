@@ -5,6 +5,7 @@ export NOTEBOOK_DIR=./notebooks
 export registry=myregistry.io
 export versionNumber=beta
 
+# export dockerfile_target=debug
 export dockerfile_target=dashboard
 
 export dockerfile_src=Dockerfile_dash
