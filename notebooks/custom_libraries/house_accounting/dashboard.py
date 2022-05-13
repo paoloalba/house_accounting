@@ -409,6 +409,9 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                 for ido, row in rem_dff.iterrows():
                     if ("id" in row.index) and row["id"]:
                         sel_ids = [row["id"]]
+                        sss = select(Cashflow).where(Cashflow.id.in_(sel_ids))
+                        for ccc in session.execute(sss).scalars():
+                            ccc.tags = []
 
                         ddd = delete(Cashflow).where(Cashflow.id.in_(sel_ids))
                         session.execute(ddd)
