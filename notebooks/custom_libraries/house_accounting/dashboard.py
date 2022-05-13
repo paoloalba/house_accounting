@@ -185,7 +185,7 @@ def filter_rows(inp_obj):
         except:
             pass
 def get_src_matching(input_sss, old_df):
-    mtch = old_df[(old_df["amount"] == input_sss["amount"]) & (old_df["date"] == input_sss["date"])]
+    mtch = old_df[(np.round(old_df["amount"], 2) == np.round(input_sss["amount"], 2)) & (old_df["date"] == input_sss["date"])]
     return len(mtch.index)
 #######
 
@@ -373,7 +373,7 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     else:
                         tmp_tag = row.tag.split(";")
 
-                    if row.description:
+                    if isinstance(row.description, str):
                         tmp_descr = row.description
                     else:
                         tmp_descr = ""
@@ -390,7 +390,7 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     )
                     session.add(cfl_entry)
                     new_entries += 1
-            if rem_dff:
+            if rem_dff is not None:
                 for ido, row in rem_dff.iterrows():
                     if ("id" in row.index) and row["id"]:
                         sel_ids = [row["id"]]
@@ -419,41 +419,43 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                 ignore_index=True,
             )
 
-        res_df = res_df.apply(filter_rows, axis=1)
+            res_df = res_df.apply(filter_rows, axis=1)
 
-        msk = res_df.apply(get_src_matching, axis=1, args=(pd.read_json(cached_df_store_data, typ="frame"),))
-        allo = res_df[msk == 0].copy()
-        allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
-        allo.time_category = allo.time_category.apply(lambda x: x.name).astype(
-            "category"
-        )
-        allo.tags = allo.tags.apply(
-            lambda x: [eee.lower().replace(" ", "") for eee in x]
-        ).apply(sorted)
+            msk = res_df.apply(get_src_matching, axis=1, args=(pd.read_json(cached_df_store_data, typ="frame"),))
+            allo = res_df[msk == 0].copy()
+            allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
+            allo.time_category = allo.time_category.apply(lambda x: x.name).astype(
+                "category"
+            )
+            allo.tags = allo.tags.apply(
+                lambda x: [eee.lower().replace(" ", "") for eee in x]
+            ).apply(sorted)
 
-        allo.rename(columns={"tags": "tag"}, inplace=True)
+            allo.rename(columns={"tags": "tag"}, inplace=True)
 
-        md_list = []
-        md_list.append(dcc.Markdown(f"Found {len(allo.index)} new entries"))
+            md_list = []
+            md_list.append(dcc.Markdown(f"Found {len(allo.index)} new entries"))
 
-        dt_df = allo.copy()
-        dt_df.tag = dt_df.tag.apply(lambda x: ";".join(x))
-        tmp_table = dash_table.DataTable(
-            columns=create_table_col_spec(dt_df),
-            data=dt_df.to_dict("records"),
-            editable=False,
-            row_deletable=False,
-            filter_action="native",
-            sort_action="native",
-            sort_mode="multi",
-            page_action="native",
-            page_current=0,
-            page_size=10,
-            filter_options=dict(case="insensitive"),
-        )
-        md_list.append(tmp_table)
+            dt_df = allo.copy()
+            dt_df.tag = dt_df.tag.apply(lambda x: ";".join(x))
+            tmp_table = dash_table.DataTable(
+                columns=create_table_col_spec(dt_df),
+                data=dt_df.to_dict("records"),
+                editable=False,
+                row_deletable=False,
+                filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                page_action="native",
+                page_current=0,
+                page_size=10,
+                filter_options=dict(case="insensitive"),
+            )
+            md_list.append(tmp_table)
 
-        return md_list, allo.to_json(), None
+            return md_list, allo.to_json(), None
+        else:
+            return "No new elements found wrt DataTable", None, None
     elif trigger == "show_diff_table_button":
         if n_clicks_show is None:
             raise PreventUpdate

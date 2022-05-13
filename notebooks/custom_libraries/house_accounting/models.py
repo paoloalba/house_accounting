@@ -123,7 +123,6 @@ class Cashflow(Base):
         chck_dict = Cashflow._unique_check_dict[target_class]
 
         sel_filter = Cashflow.get_filter(input_obj, chck_dict)
-
         if isinstance(sel_filter, list):
             existent_elements = (
                 session.query(chck_dict["class"])

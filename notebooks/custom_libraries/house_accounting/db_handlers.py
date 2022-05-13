@@ -133,6 +133,7 @@ class AccountingTable:
                     description=eee.description,
                     main_category=eee.main_category,
                     sub_category=eee.sub_category,
+                    time_category=eee.time_category,
                     tags=eee.tag.split(";"),
                 )
                 session.add(cfl_entry)
