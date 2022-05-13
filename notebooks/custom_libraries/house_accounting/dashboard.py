@@ -237,11 +237,13 @@ show_diff_table_button = html.Button("Diff DataTable", id="show_diff_table_butto
 update_database_button = html.Button("Update Database", id="update_database_button")
 reset_filters_button = html.Button("Reset filters", id="reset_filters_button")
 refresh_main_df_button = html.Button("Refresh main df", id="refresh_main_df_button")
+create_db_backup_button = html.Button("Create backup", id="create_db_backup_button")
 
 ### Text
 summary_text = dcc.Markdown(style={"white-space": "pre"})
 forecast_text = dcc.Markdown(style={"white-space": "pre"})
 data_diff = html.Div(id="data_diff")
+db_info_text = html.Div(id="db_info_text")
 
 ### stores
 cached_df_store = dcc.Store(id="cached_df_store", data=tmp_df.to_json())
@@ -278,10 +280,12 @@ app.layout = html.Div(
                         show_diff_table_button,
                         update_database_button,
                         reset_filters_button,
+                        create_db_backup_button,
                     ]
                 ),
                 upload_csv,
                 html.Br(),
+                db_info_text,
                 main_table,
                 html.Hr(),
                 data_diff,
@@ -304,6 +308,17 @@ app.layout = html.Div(
 )
 
 ### Callbacks
+@app.callback(
+    Output(db_info_text, "children"),
+    [Input(create_db_backup_button, "n_clicks")],
+)
+def create_db_backup(n_clicks):
+    md_list = []
+    md_list.append(dcc.Markdown(f"View on {acc_table.db_path}"))
+    if n_clicks is not None:
+        bckp_name = acc_table.create_backup()
+        md_list.append(dcc.Markdown(f"Created db backup: {bckp_name}"))
+    return md_list
 @app.callback(
     Output(main_table, "filter_query"),
     [Input(reset_filters_button, "n_clicks")],

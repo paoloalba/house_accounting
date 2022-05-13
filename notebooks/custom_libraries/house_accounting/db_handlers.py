@@ -149,8 +149,8 @@ class AccountingTable:
             dir_name, f"{base_name}-backup_{datetime.now():%Y%m%d%H%M}{extension}"
         )
         shutil.copy(self.db_path, new_name)
-
-    # region generate default
+        return new_name
+        
     def generate_default_db(
         self,
     ):
@@ -311,5 +311,3 @@ class AccountingTable:
                 ref_date += pd.DateOffset(weeks=1)
 
             session.commit()
-
-    # endregion
