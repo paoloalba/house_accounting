@@ -261,6 +261,15 @@ plot_aggr_dropdown = dcc.Dropdown(
     id="plot_aggr_dropdown",
     clearable=False,
 )
+plot_moving_avg_container = html.Div()
+mvg_avg_days_offset_input = dcc.Input(
+            id="mvg_avg_days_offset_input",
+            type="number",
+            value=30,
+            min=0,
+            step=1,
+            max=None,
+        )
 ### buttons
 add_row_button = html.Button("Add Row", id="add_row_button")
 update_regression_button = html.Button(
@@ -277,6 +286,7 @@ summary_text = dcc.Markdown(style={"white-space": "pre"})
 forecast_text = dcc.Markdown(style={"white-space": "pre"})
 data_diff = html.Div(id="data_diff")
 db_info_text = html.Div(id="db_info_text")
+mvg_avg_info_text = html.Div()
 
 ### stores
 cached_df_store = dcc.Store(id="cached_df_store", data=tmp_df.to_json())
@@ -309,7 +319,6 @@ app.layout = html.Div(
                     [
                         refresh_main_df_button,
                         add_row_button,
-                        update_regression_button,
                         show_diff_table_button,
                         update_database_button,
                         reset_filters_button,
@@ -326,8 +335,15 @@ app.layout = html.Div(
                 summary_text,
                 forecast_text,
                 html.Hr(),
-                plot_aggr_dropdown,
+                html.Div([
+                    update_regression_button,
+                    plot_aggr_dropdown,
+
+                ]),
                 plot_container,
+                mvg_avg_days_offset_input,
+                mvg_avg_info_text,
+                plot_moving_avg_container,
                 regression_series_store,
                 forecast_series_store,
                 main_df_store,
@@ -965,6 +981,110 @@ def update_graphs(
         )
     ]
 
+@app.callback(
+    Output(plot_moving_avg_container, "children"),
+    Output(mvg_avg_info_text, "children"),
+    Input(main_df_store, "data"),
+    Input(mvg_avg_days_offset_input, "value"),
+    State(base_amnt_store, "data"),
+)
+def update_mvg_avg_graphs(json_main_df, mvg_dys_offset, base_amnt):
+    if json_main_df:
+        dff = pd.read_json(json_main_df, typ="frame")
+        dff.date = dff.date.apply(
+            lambda x: AccountingDBManager.go_to_end_of(x, SampleFrequency.Daily)
+        )
+
+        ofs = f"{mvg_dys_offset}D"
+
+        all_ser = []
+        all_ser.append(
+            dff[dff.main_category == "Income"]
+            .groupby("date")
+            .apply(lambda x: x.amount.sum())
+            .rename(f"income-{ofs}")
+        )
+        all_ser.append(
+            dff.groupby("date").apply(lambda x: x.amount.sum()).rename(f"net-{ofs}")
+        )
+        all_ser.append(
+            dff[dff.main_category == "Outcome"]
+            .groupby("date")
+            .apply(lambda x: -x.amount.sum())
+            .rename(f"outcome-{ofs}")
+        )
+
+        box_fig = go.Figure()
+        violin_fig = go.Figure()
+        fig = go.Figure()
+        min_y = 0
+        max_y = 0
+        md_list = []
+        for ser in all_ser:
+            ser.sort_index(inplace=True)
+            ser.index = pd.to_datetime(ser.index)
+
+            ofs_int = int(ofs.replace("D", ""))
+            s1 = ser.rolling(window=ofs).sum()
+
+            start_date = s1.index.min() + pd.Timedelta(ofs_int, unit="D")
+            s1 = s1[s1.index > start_date]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=s1.index,
+                    y=s1.values,
+                    mode="lines",
+                    hovertemplate="%{y:,.2f}",
+                    name=ser.name,
+                )
+            )
+            mu = s1.mean()
+            sigma = s1.std()
+            fact = 2
+            min_y = min(min_y, mu - fact * sigma)
+            max_y = max(max_y, mu + fact * sigma)
+            md_list.append(dcc.Markdown(
+                f"{ser.name:<15}: {mu:,.2f}"
+                + " \u00B1 "
+                + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}"
+            ))
+
+            box_fig.add_trace(go.Box(y=s1.values, name=ser.name, boxmean="sd"))
+
+            violin_fig.add_trace(
+                go.Violin(
+                    y=s1.values, name=ser.name, box_visible=False, meanline_visible=True
+                )
+            )
+
+        fig.update_layout(hovermode="x", yaxis_range=[0, max_y])
+        box_fig.update_layout(
+            # autosize=False,
+            width=700,
+            height=800,
+        )
+        violin_fig.update_layout(
+            # autosize=False,
+            width=700,
+            height=800,
+        )
+        return [
+            html.Div([
+                html.Div([
+                    dcc.Graph(
+                        figure=box_fig,
+                    )
+                ], style={'display': 'inline-block'}),
+            html.Div([dcc.Graph(
+                figure=violin_fig,
+            )], style={'display': 'inline-block'})], style={'width': '100%', 'display': 'inline-block'}),
+            dcc.Graph(
+                figure=fig,
+            )
+        ], md_list
+    else:
+        raise PreventUpdate
 
 #######
 
