@@ -263,13 +263,13 @@ plot_aggr_dropdown = dcc.Dropdown(
 )
 plot_moving_avg_container = html.Div()
 mvg_avg_days_offset_input = dcc.Input(
-            id="mvg_avg_days_offset_input",
-            type="number",
-            value=30,
-            min=0,
-            step=1,
-            max=None,
-        )
+    id="mvg_avg_days_offset_input",
+    type="number",
+    value=30,
+    min=0,
+    step=1,
+    max=None,
+)
 ### buttons
 add_row_button = html.Button("Add Row", id="add_row_button")
 update_regression_button = html.Button(
@@ -335,11 +335,12 @@ app.layout = html.Div(
                 summary_text,
                 forecast_text,
                 html.Hr(),
-                html.Div([
-                    update_regression_button,
-                    plot_aggr_dropdown,
-
-                ]),
+                html.Div(
+                    [
+                        update_regression_button,
+                        plot_aggr_dropdown,
+                    ]
+                ),
                 plot_container,
                 mvg_avg_days_offset_input,
                 mvg_avg_info_text,
@@ -981,6 +982,7 @@ def update_graphs(
         )
     ]
 
+
 @app.callback(
     Output(plot_moving_avg_container, "children"),
     Output(mvg_avg_info_text, "children"),
@@ -1044,11 +1046,13 @@ def update_mvg_avg_graphs(json_main_df, mvg_dys_offset, base_amnt):
             fact = 2
             min_y = min(min_y, mu - fact * sigma)
             max_y = max(max_y, mu + fact * sigma)
-            md_list.append(dcc.Markdown(
-                f"{ser.name:<15}: {mu:,.2f}"
-                + " \u00B1 "
-                + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}"
-            ))
+            md_list.append(
+                dcc.Markdown(
+                    f"{ser.name:<15}: {mu:,.2f}"
+                    + " \u00B1 "
+                    + f"{sigma:,.2f}; q1%->{s1.quantile(0.01):,.2f}, q10%->{s1.quantile(0.1):,.2f}, q50%->{s1.quantile(0.5):,.2f}, q90%->{s1.quantile(0.9):,.2f}, q99%->{s1.quantile(0.99):,.2f}"
+                )
+            )
 
             box_fig.add_trace(go.Box(y=s1.values, name=ser.name, boxmean="sd"))
 
@@ -1070,21 +1074,34 @@ def update_mvg_avg_graphs(json_main_df, mvg_dys_offset, base_amnt):
             height=800,
         )
         return [
-            html.Div([
-                html.Div([
-                    dcc.Graph(
-                        figure=box_fig,
-                    )
-                ], style={'display': 'inline-block'}),
-            html.Div([dcc.Graph(
-                figure=violin_fig,
-            )], style={'display': 'inline-block'})], style={'width': '100%', 'display': 'inline-block'}),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            dcc.Graph(
+                                figure=box_fig,
+                            )
+                        ],
+                        style={"display": "inline-block"},
+                    ),
+                    html.Div(
+                        [
+                            dcc.Graph(
+                                figure=violin_fig,
+                            )
+                        ],
+                        style={"display": "inline-block"},
+                    ),
+                ],
+                style={"width": "100%", "display": "inline-block"},
+            ),
             dcc.Graph(
                 figure=fig,
-            )
+            ),
         ], md_list
     else:
         raise PreventUpdate
+
 
 #######
 
