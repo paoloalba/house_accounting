@@ -26,6 +26,7 @@ class TimeCategory(Enum):
 
 
 class SampleFrequency(Enum):
+    NA = 0
     Daily = 1
     Weekly = 2
     Monthly = 3

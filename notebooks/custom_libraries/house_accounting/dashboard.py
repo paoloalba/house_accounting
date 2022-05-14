@@ -222,12 +222,22 @@ main_table = dash_table.DataTable(
 
 ### graphs
 plot_container = html.Div()
-main_series_store = dcc.Store(id="main_series_store")
 regression_series_store = dcc.Store(id="regression_series_store")
 forecast_series_store = dcc.Store(id="forecast_series_store")
 main_df_store = dcc.Store(id="main_df_store")
 base_amnt_store = dcc.Store(id="base_amnt_store")
-
+plot_aggr_dropdown = dcc.Dropdown(
+   options=[
+       {'label': SampleFrequency.Daily.name, 'value': SampleFrequency.Daily.name},
+       {'label': SampleFrequency.Weekly.name, 'value': SampleFrequency.Weekly.name},
+       {'label': SampleFrequency.Monthly.name, 'value': SampleFrequency.Monthly.name},
+       {'label': SampleFrequency.Quarterly.name, 'value': SampleFrequency.Quarterly.name},
+       {'label': SampleFrequency.Yearly.name, 'value': SampleFrequency.Yearly.name},
+   ],
+   value=SampleFrequency.Daily.name,
+   id="plot_aggr_dropdown",
+   clearable=False
+)
 ### buttons
 add_row_button = html.Button("Add Row", id="add_row_button")
 update_regression_button = html.Button(
@@ -293,8 +303,8 @@ app.layout = html.Div(
                 summary_text,
                 forecast_text,
                 html.Hr(),
+                plot_aggr_dropdown,
                 plot_container,
-                main_series_store,
                 regression_series_store,
                 forecast_series_store,
                 main_df_store,
@@ -598,7 +608,6 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
     else:
         raise PreventUpdate
 @app.callback(
-    Output(main_series_store, "data"),
     Output(main_df_store, "data"),
     Output(base_amnt_store, "data"),
     Output(summary_text, "children"),
@@ -607,7 +616,9 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
 )
 def update_main_series(rows, cached_df_store_data):
 
-    dff = pd.read_json(cached_df_store_data, typ="frame") if rows is None else pd.DataFrame(rows)
+    cached_df = pd.read_json(cached_df_store_data, typ="frame")
+
+    dff = cached_df if rows is None else pd.DataFrame(rows)
     dff = dff[dff["id"] != ""]
     if len(dff.index) == 0:
         raise PreventUpdate
@@ -636,8 +647,13 @@ def update_main_series(rows, cached_df_store_data):
         _,
     ) = AccountingDBManager.get_income_analysis(norm_df)
 
-    base_amnt = 0
-    min_date = datetime.min
+    past_df = cached_df[cached_df["date"] < dff["date"].min()]
+
+    base_amnt = past_df["amount"].sum()
+    if len(past_df.index) > 0:
+        min_date = past_df["date"].max()
+    else:
+        min_date = datetime.min
     tmp_init_df = dff[dff.sub_category == SubCategory.Initial.name]
     if len(tmp_init_df.index) > 0:
         base_amnt += tmp_init_df.amount.sum()
@@ -679,7 +695,6 @@ def update_main_series(rows, cached_df_store_data):
 
     if len(ser.index) > 0:
         return (
-            ser.to_json(),
             dff.to_json(),
             json.dumps({"base_amnt": base_amnt}),
             md_text,
@@ -688,20 +703,19 @@ def update_main_series(rows, cached_df_store_data):
         raise PreventUpdate
 @app.callback(
     Output(plot_container, "children"),
-    Input(main_series_store, "data"),
+    Input(main_df_store, "data"),
     Input(regression_series_store, "data"),
     Input(forecast_series_store, "data"),
+    Input(plot_aggr_dropdown, "value"),
     State(base_amnt_store, "data"),
-    State(main_df_store, "data"),
 )
 def update_graphs(
-    json_main_series,
+    json_main_df,
     json_regression_series,
     json_forecast_series,
+    plot_aggr_frq,
     json_base_amnt,
-    json_main_df,
 ):
-
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -711,11 +725,18 @@ def update_graphs(
         column_widths=[0.7, 0.3],
     )
 
-    if json_main_series:
-        ser = pd.read_json(json_main_series, typ="series")
+    if json_main_df:
+        plot_aggr_frq = SampleFrequency[plot_aggr_frq]
+        dff = pd.read_json(json_main_df, typ="frame")
+        dff.date = dff.date.apply(
+            lambda x: AccountingDBManager.go_to_end_of(
+                x, plot_aggr_frq
+            )
+        )
+        ser = dff.groupby("date").apply(lambda x: x.amount.sum()).rename("bank account")
+        ser.sort_index(inplace=True)
         base_amnt = json.loads(json_base_amnt)["base_amnt"]
         ser_cum_sum = ser.cumsum() + base_amnt
-        dff = pd.read_json(json_main_df, typ="frame")
 
         fig.add_trace(
             go.Scatter(
@@ -748,7 +769,17 @@ def update_graphs(
                 measures.append("relative")
                 values.append(vvv)
 
-        sel_tune = days
+        match plot_aggr_frq:
+            case SampleFrequency.Daily:
+                sel_tune = days
+            case SampleFrequency.Weekly:
+                sel_tune = weeks
+            case SampleFrequency.Monthly:
+                sel_tune = months
+            case SampleFrequency.Quarterly:
+                sel_tune = quarters
+            case SampleFrequency.Yearly:
+                sel_tune = years
 
         fig.add_trace(
             go.Waterfall(

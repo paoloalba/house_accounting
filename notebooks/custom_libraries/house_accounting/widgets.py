@@ -11,7 +11,6 @@ from IPython.display import display
 from datetime import date, timedelta
 from sqlalchemy.sql import select, delete
 from sqlalchemy.orm import Session
-from pandas.tseries.offsets import MonthEnd, Week
 
 from house_accounting.models import (
     Cashflow,
@@ -387,25 +386,20 @@ class AccountingDBManager(WidgetBase):
     # region static helpers
     @staticmethod
     def go_to_end_of(input_date, frq):
-        current_date = input_date
         if frq == SampleFrequency.Weekly:
-            return input_date + Week(weekday=6)
+            return (input_date + pd.offsets.Week(weekday=6)).date()
         elif frq == SampleFrequency.Monthly:
-            return input_date + MonthEnd(0)
+            return (input_date + pd.offsets.MonthEnd()).date()
         elif frq == SampleFrequency.Yearly:
-            while current_date.year == input_date.year:
-                current_date = input_date
-                input_date += timedelta(days=1)
+            return (input_date + pd.offsets.YearEnd()).date()
         elif frq == SampleFrequency.Daily:
-            pass
+            return input_date.date()
+        elif frq == SampleFrequency.NA:
+            return input_date
         elif frq == SampleFrequency.Quarterly:
-            while (current_date.month - 1) // 3 == (input_date.month - 1) // 3:
-                current_date = input_date
-                input_date += timedelta(days=1)
+            return (input_date + pd.offsets.QuarterEnd()).date()
         else:
-            raise Exception("Unrecognised sample frequency")
-
-        return current_date
+            raise Exception(f"Unrecognised sample frequency: {frq}")
 
     @staticmethod
     def diff_year(d1, d2):
