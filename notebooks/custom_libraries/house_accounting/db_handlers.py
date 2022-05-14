@@ -150,7 +150,7 @@ class AccountingTable:
         )
         shutil.copy(self.db_path, new_name)
         return new_name
-        
+
     def generate_default_db(
         self,
     ):

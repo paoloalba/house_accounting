@@ -58,6 +58,8 @@ def create_table_col_spec(input_df):
             tmp_dict["filter_options"] = dict(case="sensitive")
         datatable_cols.append(tmp_dict)
     return datatable_cols
+
+
 def get_fit_df(input_df, past_amnt):
     fil_df = pd.get_dummies(
         input_df, columns=["main_category", "sub_category", "time_category"]
@@ -167,26 +169,44 @@ def get_fit_df(input_df, past_amnt):
     fore_ci.sort_index(inplace=True)
 
     return predict_ci, fore_ci
+
+
 def diff_dashtable(new_data, old_df):
 
     new_df = pd.DataFrame(data=new_data)
 
     new_df["date"] = pd.to_datetime(new_df["date"])
-    new_df["amount"] = new_df["amount"].apply(lambda x: np.round(x, 2) if isinstance(x, float) else x)
+    new_df["amount"] = new_df["amount"].apply(
+        lambda x: np.round(x, 2) if isinstance(x, float) else x
+    )
 
     old_df["date"] = pd.to_datetime(old_df["date"])
-    old_df["amount"] = old_df["amount"].apply(lambda x: np.round(x, 2) if isinstance(x, float) else x)
+    old_df["amount"] = old_df["amount"].apply(
+        lambda x: np.round(x, 2) if isinstance(x, float) else x
+    )
 
-    return new_df[~new_df.apply(tuple, 1).isin(old_df.apply(tuple, 1))], old_df[~old_df.apply(tuple, 1).isin(new_df.apply(tuple, 1))]
+    return (
+        new_df[~new_df.apply(tuple, 1).isin(old_df.apply(tuple, 1))],
+        old_df[~old_df.apply(tuple, 1).isin(new_df.apply(tuple, 1))],
+    )
+
+
 def filter_rows(inp_obj):
     for _, fff in filters.items():
         try:
             return pd.Series(fff.map_row(inp_obj))
         except:
             pass
+
+
 def get_src_matching(input_sss, old_df):
-    mtch = old_df[(np.round(old_df["amount"], 2) == np.round(input_sss["amount"], 2)) & (old_df["date"] == input_sss["date"])]
+    mtch = old_df[
+        (np.round(old_df["amount"], 2) == np.round(input_sss["amount"], 2))
+        & (old_df["date"] == input_sss["date"])
+    ]
     return len(mtch.index)
+
+
 #######
 
 app = Dash(__name__)
@@ -227,16 +247,19 @@ forecast_series_store = dcc.Store(id="forecast_series_store")
 main_df_store = dcc.Store(id="main_df_store")
 base_amnt_store = dcc.Store(id="base_amnt_store")
 plot_aggr_dropdown = dcc.Dropdown(
-   options=[
-       {'label': SampleFrequency.Daily.name, 'value': SampleFrequency.Daily.name},
-       {'label': SampleFrequency.Weekly.name, 'value': SampleFrequency.Weekly.name},
-       {'label': SampleFrequency.Monthly.name, 'value': SampleFrequency.Monthly.name},
-       {'label': SampleFrequency.Quarterly.name, 'value': SampleFrequency.Quarterly.name},
-       {'label': SampleFrequency.Yearly.name, 'value': SampleFrequency.Yearly.name},
-   ],
-   value=SampleFrequency.Daily.name,
-   id="plot_aggr_dropdown",
-   clearable=False
+    options=[
+        {"label": SampleFrequency.Daily.name, "value": SampleFrequency.Daily.name},
+        {"label": SampleFrequency.Weekly.name, "value": SampleFrequency.Weekly.name},
+        {"label": SampleFrequency.Monthly.name, "value": SampleFrequency.Monthly.name},
+        {
+            "label": SampleFrequency.Quarterly.name,
+            "value": SampleFrequency.Quarterly.name,
+        },
+        {"label": SampleFrequency.Yearly.name, "value": SampleFrequency.Yearly.name},
+    ],
+    value=SampleFrequency.Daily.name,
+    id="plot_aggr_dropdown",
+    clearable=False,
 )
 ### buttons
 add_row_button = html.Button("Add Row", id="add_row_button")
@@ -329,6 +352,8 @@ def create_db_backup(n_clicks):
         bckp_name = acc_table.create_backup()
         md_list.append(dcc.Markdown(f"Created db backup: {bckp_name}"))
     return md_list
+
+
 @app.callback(
     Output(main_table, "filter_query"),
     [Input(reset_filters_button, "n_clicks")],
@@ -338,6 +363,8 @@ def clearFilter(n_clicks, state):
     if n_clicks is None:
         return "" if state is None else state
     return ""
+
+
 @app.callback(
     Output(data_diff, "children"),
     Output(data_diff_store, "data"),
@@ -354,7 +381,15 @@ def clearFilter(n_clicks, state):
         State(cached_df_store, "data"),
     ],
 )
-def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_diff, removed_data_diff, cached_df_store_data):
+def update_output(
+    n_clicks_show,
+    n_clicks_update,
+    list_of_contents,
+    data,
+    data_diff,
+    removed_data_diff,
+    cached_df_store_data,
+):
     ctx = dash.callback_context
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
@@ -449,9 +484,15 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
 
             res_df = res_df.apply(filter_rows, axis=1)
 
-            msk = res_df.apply(get_src_matching, axis=1, args=(pd.read_json(cached_df_store_data, typ="frame"),))
+            msk = res_df.apply(
+                get_src_matching,
+                axis=1,
+                args=(pd.read_json(cached_df_store_data, typ="frame"),),
+            )
             allo = res_df[msk == 0].copy()
-            allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype("category")
+            allo.sub_category = allo.sub_category.apply(lambda x: x.name).astype(
+                "category"
+            )
             allo.time_category = allo.time_category.apply(lambda x: x.name).astype(
                 "category"
             )
@@ -488,12 +529,14 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
         if n_clicks_show is None:
             raise PreventUpdate
 
-        diff_store_data, removed_data = diff_dashtable(data, pd.read_json(cached_df_store_data, typ="frame"))
+        diff_store_data, removed_data = diff_dashtable(
+            data, pd.read_json(cached_df_store_data, typ="frame")
+        )
 
         if len(diff_store_data.index) > 0 or len(removed_data.index) > 0:
             md_list = []
 
-            if len(removed_data.index)>0 and len(diff_store_data.index)>0:
+            if len(removed_data.index) > 0 and len(diff_store_data.index) > 0:
                 msk_2 = removed_data.id.isin(diff_store_data.id)
                 pre_mod_data = removed_data[msk_2]
                 removed_data = removed_data[~msk_2]
@@ -508,7 +551,7 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                         if v1 == v2:
                             tmp_dict[iii] = str(v1)
                         else:
-                            tmp_dict[iii] = f'{v2} -> {v1}'
+                            tmp_dict[iii] = f"{v2} -> {v1}"
                     all_df.append(tmp_dict)
                 pre_mod_data = pd.DataFrame.from_records(all_df)
             else:
@@ -528,7 +571,17 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
                     page_current=0,
                     page_size=10,
                     filter_options=dict(case="insensitive"),
-                    style_data_conditional=[{'if': {'filter_query': '{{{}}} contains ->'.format(col), 'column_id': col}, 'backgroundColor': '#FF4136', 'color': 'white'} for col in dt_df.columns]
+                    style_data_conditional=[
+                        {
+                            "if": {
+                                "filter_query": "{{{}}} contains ->".format(col),
+                                "column_id": col,
+                            },
+                            "backgroundColor": "#FF4136",
+                            "color": "white",
+                        }
+                        for col in dt_df.columns
+                    ],
                 )
                 md_list.append(dcc.Markdown("Modified rows"))
                 md_list.append(tmp_table)
@@ -555,6 +608,8 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
             return "No Changes to DataTable", None, None
     else:
         raise PreventUpdate
+
+
 @app.callback(
     Output(main_table, "data"),
     Output(main_table, "columns"),
@@ -565,7 +620,9 @@ def update_output(n_clicks_show, n_clicks_update, list_of_contents, data, data_d
     State(main_table, "columns"),
     State(cached_df_store, "data"),
 )
-def update_main_table_data(add_row_n_clicks, refresh_n_clicks, rows, columns, cached_df_data):
+def update_main_table_data(
+    add_row_n_clicks, refresh_n_clicks, rows, columns, cached_df_data
+):
     ctx = dash.callback_context
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
@@ -581,6 +638,8 @@ def update_main_table_data(add_row_n_clicks, refresh_n_clicks, rows, columns, ca
             return df.to_dict("records"), create_table_col_spec(df), df.to_json()
     else:
         raise PreventUpdate
+
+
 @app.callback(
     Output(regression_series_store, "data"),
     Output(forecast_series_store, "data"),
@@ -607,12 +666,14 @@ def update_regression(n_clicks, json_main_df, json_base_amnt):
         return regr_df.to_json(), forecast_df.to_json(), md_text
     else:
         raise PreventUpdate
+
+
 @app.callback(
     Output(main_df_store, "data"),
     Output(base_amnt_store, "data"),
     Output(summary_text, "children"),
     Input(main_table, "derived_virtual_data"),
-    State(cached_df_store, "data")
+    State(cached_df_store, "data"),
 )
 def update_main_series(rows, cached_df_store_data):
 
@@ -701,6 +762,8 @@ def update_main_series(rows, cached_df_store_data):
         )
     else:
         raise PreventUpdate
+
+
 @app.callback(
     Output(plot_container, "children"),
     Input(main_df_store, "data"),
@@ -729,9 +792,7 @@ def update_graphs(
         plot_aggr_frq = SampleFrequency[plot_aggr_frq]
         dff = pd.read_json(json_main_df, typ="frame")
         dff.date = dff.date.apply(
-            lambda x: AccountingDBManager.go_to_end_of(
-                x, plot_aggr_frq
-            )
+            lambda x: AccountingDBManager.go_to_end_of(x, plot_aggr_frq)
         )
         ser = dff.groupby("date").apply(lambda x: x.amount.sum()).rename("bank account")
         ser.sort_index(inplace=True)
@@ -903,6 +964,8 @@ def update_graphs(
             figure=fig,
         )
     ]
+
+
 #######
 
 if __name__ == "__main__":
