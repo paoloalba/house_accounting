@@ -17,5 +17,6 @@ CMD ["python", "-m", "ptvsd", "--host", "0.0.0.0", "--port", "8889", "--wait", "
 
 FROM base as prod
 RUN pip install ipywidgets==8.0.0rc0
+RUN pip install pandarallel
 
 CMD ["jupyter", "lab", "--ip", "0.0.0.0"]

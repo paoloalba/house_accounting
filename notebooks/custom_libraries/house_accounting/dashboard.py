@@ -415,6 +415,8 @@ def update_output(
             raise PreventUpdate
 
         dff = pd.read_json(data_diff, typ="frame")
+        dff["tag"] = dff["tag"].apply(lambda x: x.split(";"))
+        dff.rename(columns={"tag": "tags"}, inplace=True)
         if removed_data_diff:
             rem_dff = pd.read_json(removed_data_diff, typ="frame")
         else:
@@ -445,10 +447,10 @@ def update_output(
                     else:
                         main_cat = MainCategory.Outcome
 
-                    if isinstance(row.tag, list):
-                        tmp_tag = row.tag
+                    if isinstance(row.tags, list):
+                        tmp_tag = row.tags
                     else:
-                        tmp_tag = row.tag.split(";")
+                        tmp_tag = row.tags.split(";")
 
                     if isinstance(row.description, str):
                         tmp_descr = row.description
