@@ -27,8 +27,14 @@ from house_accounting.enumerators import SampleFrequency
 from house_accounting.widgets import AccountingDBManager
 from config import global_config
 from house_accounting.models import Cashflow
-from generic_helpers.row_filters import filters
-from generic_helpers.generic import parse_extracted_csv
+
+try:
+    from generic_helpers.row_filters import filters
+    from generic_helpers.generic import parse_extracted_csv
+except:
+    filters = {}
+    def parse_extracted_csv(*args, **kwargs):
+        raise NotImplementedError()
 
 original_pmt_storage = os.getenv("PMT_STG_PATH")
 pmt_storage = os.path.join(original_pmt_storage, "house_accounting")
