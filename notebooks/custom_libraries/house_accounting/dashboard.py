@@ -222,6 +222,8 @@ dropdown["time_category"] = dict(
     options=[{"label": i.name, "value": i.name} for i in list(TimeCategory)]
 )
 
+base_sort_list = [{"column_id": "date", "direction": "desc"}]
+
 tmp_df = acc_table.get_df()
 tmp_df["date"] = pd.to_datetime(tmp_df["date"])
 main_table = dash_table.DataTable(
@@ -232,12 +234,55 @@ main_table = dash_table.DataTable(
     filter_action="native",
     sort_action="native",
     sort_mode="multi",
-    row_selectable="multi",
+    # row_selectable="multi",
     page_action="native",
     page_current=0,
     page_size=10,
     dropdown=dropdown,
     filter_options=dict(case="insensitive"),
+    sort_by=base_sort_list,
+    style_data_conditional=[
+        {
+            'if': {
+                'filter_query': '{time_category} contains "Exceptional"',
+                'column_id': 'time_category',
+            },
+            'backgroundColor': '#ff8080',
+            'color': 'white',
+        },
+        {
+            'if': {
+                'filter_query': '{time_category} contains "Recurring"',
+                'column_id': 'time_category',
+            },
+            'backgroundColor': '#85e085',
+            'color': 'white',
+        },
+        {
+            'if': {
+                'filter_query': '{time_category} contains "OneTime"',
+                'column_id': 'time_category',
+            },
+            'backgroundColor': '#ffff66',
+            'color': 'black',
+        },
+        {
+            'if': {
+                'filter_query': '{main_category} contains "Outcome"',
+                'column_id': ['amount', 'main_category'],
+            },
+            'backgroundColor': '#ff3333',
+            'color': 'white',
+        },
+        {
+            'if': {
+                'filter_query': '{main_category} contains "Income"',
+                'column_id': ['amount', 'main_category'],
+            },
+            'backgroundColor': '#70db70',
+            'color': 'white',
+        },
+    ],
 )
 
 ### graphs
@@ -373,13 +418,14 @@ def create_db_backup(n_clicks):
 
 @app.callback(
     Output(main_table, "filter_query"),
+    Output(main_table, "sort_by"),
     [Input(reset_filters_button, "n_clicks")],
     [State(main_table, "filter_query")],
 )
 def clearFilter(n_clicks, state):
     if n_clicks is None:
-        return "" if state is None else state
-    return ""
+        return "" if state is None else state, base_sort_list
+    return "", base_sort_list
 
 
 @app.callback(
@@ -415,7 +461,7 @@ def update_output(
             raise PreventUpdate
 
         dff = pd.read_json(data_diff, typ="frame")
-        dff["tag"] = dff["tag"].apply(lambda x: x.split(";"))
+        dff["tag"] = dff["tag"].apply(lambda x: x if isinstance(x, list) else x.split(";"))
         dff.rename(columns={"tag": "tags"}, inplace=True)
         if removed_data_diff:
             rem_dff = pd.read_json(removed_data_diff, typ="frame")
