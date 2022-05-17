@@ -1,0 +1,8 @@
+FROM jupyter/tensorflow-notebook:python-3.9.10 as base
+
+RUN pip install ipywidgets==8.0.0rc0
+RUN pip install pandarallel
+
+FROM base as tf
+
+CMD ["jupyter", "lab", "--ip", "0.0.0.0"]
