@@ -66,24 +66,23 @@ def create_table_col_spec(input_df):
     return datatable_cols
 
 
-def get_fit_df(input_df, past_amnt):
+def get_fit_df(input_df, past_amnt, sampl_frq):
     fil_df = pd.get_dummies(
         input_df, columns=["main_category", "sub_category", "time_category"]
     )
 
-    sampl_frq = SampleFrequency.Weekly
     if sampl_frq == SampleFrequency.Monthly:
         d_frq = pd.offsets.MonthEnd()
         num_bus_days = 12
-        ido1 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(53)]
-        ido2 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(53)]
+        ido1 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(num_bus_days + 1)]
+        ido2 = [1 if (iii in [0, 1, 2]) else 0 for iii in range(num_bus_days + 1)]
     elif sampl_frq == SampleFrequency.Weekly:
         d_frq = pd.offsets.Week(weekday=6)
         num_bus_days = 52
-        ido1 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
-        ido2 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(53)]
+        ido1 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(num_bus_days + 1)]
+        ido2 = [1 if (iii in [0, 1, 2, 3]) else 0 for iii in range(num_bus_days + 1)]
     else:
-        raise Exception()
+        raise Exception(f"Unsupported frequency {sampl_frq}")
 
     fil_df.date = fil_df.date.apply(
         lambda x: AccountingDBManager.go_to_end_of(x, sampl_frq)
@@ -217,6 +216,7 @@ def get_src_matching(input_sss, old_df):
 
 app = Dash(__name__)
 
+### Main Table
 dropdown = {}
 dropdown["main_category"] = dict(
     options=[{"label": i.name, "value": i.name} for i in list(MainCategory)]
@@ -291,6 +291,15 @@ main_table = dash_table.DataTable(
     ],
 )
 
+custom_filter_radio = dcc.RadioItems(
+    [{'label': 'Read filter_query', 'value': 'read'}, {'label': 'Write to filter_query', 'value': 'write'}],
+    'read',
+    id='custom_filter_radio',
+)
+filter_query_input = dcc.Input(id='filter_query_input', placeholder='Enter filter query')
+filter_query_output = html.Div(id='filter_query_output')
+
+
 ### graphs
 plot_container = html.Div()
 regression_series_store = dcc.Store(id="regression_series_store")
@@ -311,6 +320,11 @@ plot_aggr_dropdown = dcc.Dropdown(
     value=SampleFrequency.Daily.name,
     id="plot_aggr_dropdown",
     clearable=False,
+    style=dict(
+                    width='40%',
+                    display='inline-block',
+                    verticalAlign="middle"
+                )
 )
 plot_moving_avg_container = html.Div()
 mvg_avg_days_offset_input = dcc.Input(
@@ -321,6 +335,27 @@ mvg_avg_days_offset_input = dcc.Input(
     step=1,
     max=None,
 )
+regr_aggr_dropdown = dcc.Dropdown(
+    options=[
+        {"label": SampleFrequency.Daily.name, "value": SampleFrequency.Daily.name},
+        {"label": SampleFrequency.Weekly.name, "value": SampleFrequency.Weekly.name},
+        {"label": SampleFrequency.Monthly.name, "value": SampleFrequency.Monthly.name},
+        {
+            "label": SampleFrequency.Quarterly.name,
+            "value": SampleFrequency.Quarterly.name,
+        },
+        {"label": SampleFrequency.Yearly.name, "value": SampleFrequency.Yearly.name},
+    ],
+    value=SampleFrequency.Weekly.name,
+    id="regr_aggr_dropdown",
+    clearable=False,
+    style=dict(
+                    width='40%',
+                    display='inline-block',
+                    verticalAlign="middle"
+                )
+)
+
 ### buttons
 add_row_button = html.Button("Add Row", id="add_row_button")
 update_regression_button = html.Button(
@@ -362,6 +397,7 @@ upload_csv = dcc.Upload(
 )
 
 ### main layouy
+
 app.layout = html.Div(
     [
         html.Div(
@@ -379,6 +415,11 @@ app.layout = html.Div(
                 upload_csv,
                 html.Br(),
                 db_info_text,
+                html.Div([
+                    custom_filter_radio,
+                    filter_query_input,
+                    filter_query_output,
+                ]),
                 main_table,
                 html.Hr(),
                 data_diff,
@@ -389,7 +430,30 @@ app.layout = html.Div(
                 html.Div(
                     [
                         update_regression_button,
-                        plot_aggr_dropdown,
+                        html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.H4("""Data aggregation frequency""",
+                                                    style={'margin-right': '2em'})
+                                        ],
+                                    ),
+                                    plot_aggr_dropdown,
+                                ],
+                                style=dict(display='flex')
+                        ),
+                        html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.H4("""Regression basis aggregation frequency""",
+                                                    style={'margin-right': '2em'})
+                                        ],
+                                    ),
+                                    regr_aggr_dropdown,
+                                ],
+                                style=dict(display='flex')
+                        ),
                     ]
                 ),
                 plot_container,
@@ -409,6 +473,32 @@ app.layout = html.Div(
 )
 
 ### Callbacks
+
+@app.callback(
+    Output(filter_query_input, 'style'),
+    Output(filter_query_output, 'style'),
+    Input(custom_filter_radio, 'value')
+)
+def query_input_output(val):
+    input_style = {'width': '100%'}
+    output_style = {}
+    if val == 'read':
+        input_style.update(display='none')
+        output_style.update(display='inline-block')
+    else:
+        input_style.update(display='inline-block')
+        output_style.update(display='none')
+    return input_style, output_style
+
+@app.callback(
+    Output(filter_query_output, 'children'),
+    Input(main_table, 'filter_query')
+)
+def read_query(query):
+    if query is None:
+        return "No filter query"
+    return dcc.Markdown('`filter_query = "{}"`'.format(query))
+
 @app.callback(
     Output(db_info_text, "children"),
     [Input(create_db_backup_button, "n_clicks")],
@@ -425,13 +515,29 @@ def create_db_backup(n_clicks):
 @app.callback(
     Output(main_table, "filter_query"),
     Output(main_table, "sort_by"),
-    [Input(reset_filters_button, "n_clicks")],
-    [State(main_table, "filter_query")],
+    [
+        Input(reset_filters_button, "n_clicks"),
+        Input(filter_query_input, 'value'),
+    ],
+    [
+        State(main_table, "filter_query"),
+        State(main_table, "sort_by"),
+    ],
 )
-def clearFilter(n_clicks, state):
-    if n_clicks is None:
-        return "" if state is None else state, base_sort_list
-    return "", base_sort_list
+def update_filters(reset_filters_n_clicks, input_filter_query, current_filter_query, current_sort_by):
+    ctx = dash.callback_context
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger == "reset_filters_button":
+        if reset_filters_n_clicks is None:
+            return "" if current_filter_query is None else current_filter_query, current_sort_by
+        return "", base_sort_list
+    elif trigger == "filter_query_input":
+        if input_filter_query is None:
+            return current_filter_query, current_sort_by
+        return input_filter_query, current_sort_by
+    else:
+        raise PreventUpdate
 
 
 @app.callback(
@@ -718,13 +824,15 @@ def update_main_table_data(
     Input(update_regression_button, "n_clicks"),
     State(main_df_store, "data"),
     State(base_amnt_store, "data"),
+    State(regr_aggr_dropdown, "value"),
 )
-def update_regression(n_clicks, json_main_df, json_base_amnt):
+def update_regression(n_clicks, json_main_df, json_base_amnt, regr_frq):
     if n_clicks:
         dff = pd.read_json(json_main_df, typ="frame")
         base_amnt = json.loads(json_base_amnt)["base_amnt"]
+        regr_frq = SampleFrequency[regr_frq]
 
-        regr_df, forecast_df = get_fit_df(dff, base_amnt)
+        regr_df, forecast_df = get_fit_df(dff, base_amnt, regr_frq)
 
         md_arro = []
         allo = forecast_df.iloc[-1]
