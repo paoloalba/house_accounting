@@ -2,8 +2,6 @@ import os
 import sys
 import json
 import dash
-import base64
-import io
 
 import numpy as np
 import pandas as pd
@@ -202,6 +200,7 @@ def filter_rows(inp_obj):
             return pd.Series(fff.map_row(inp_obj))
         except:
             pass
+    raise Exception(f"Impossible to filter row:\n{inp_obj}")
 
 
 def get_src_matching(input_sss, old_df):
@@ -241,6 +240,7 @@ main_table = dash_table.DataTable(
     sort_action="native",
     sort_mode="multi",
     # row_selectable="multi",
+    export_format="xlsx",
     page_action="native",
     page_current=0,
     page_size=10,
@@ -548,6 +548,7 @@ def update_filters(reset_filters_n_clicks, input_filter_query, current_filter_qu
         Input(show_diff_table_button, "n_clicks"),
         Input(update_database_button, "n_clicks"),
         Input(upload_csv, "contents"),
+        Input(upload_csv, "filename"),
     ],
     [
         State(main_table, "data"),
@@ -560,6 +561,7 @@ def update_output(
     n_clicks_show,
     n_clicks_update,
     list_of_contents,
+    list_of_filenames,
     data,
     data_diff,
     removed_data_diff,
@@ -647,17 +649,7 @@ def update_output(
     elif trigger == "upload_csv":
         if list_of_contents is not None:
 
-            all_df = []
-            for fff in list_of_contents:
-                content_type, content_string = fff.split(",")
-                decoded = base64.b64decode(content_string)
-                all_df.append(parse_extracted_csv(io.StringIO(decoded.decode("utf-8"))))
-
-            res_df = pd.concat(all_df)
-            res_df.drop_duplicates(
-                inplace=True,
-                ignore_index=True,
-            )
+            res_df = parse_extracted_csv(zip(list_of_contents, list_of_filenames))
 
             res_df = res_df.apply(filter_rows, axis=1)
 

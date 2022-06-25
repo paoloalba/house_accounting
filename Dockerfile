@@ -1,4 +1,4 @@
-FROM jupyter/scipy-notebook:python-3.9.10 as base
+FROM jupyter/scipy-notebook:python-3.10.4 as base
 
 RUN pip install nb_black
 RUN pip install plotly
